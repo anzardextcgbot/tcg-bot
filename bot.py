@@ -1074,7 +1074,7 @@ async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
 
         result = check_restock(url)
 
-                cursor.execute(
+        cursor.execute(
             """
             SELECT last_status
             FROM restock_status
@@ -1121,11 +1121,6 @@ async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
                     chat_id=user_id,
                     text=text
                 )
-
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text
-            )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

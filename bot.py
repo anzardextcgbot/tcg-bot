@@ -944,6 +944,32 @@ async def trackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✅ URL wird jetzt überwacht."
     )
+async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT url
+        FROM tracked_urls
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    results = cursor.fetchall()
+
+    if not results:
+        await update.message.reply_text(
+            "Du beobachtest noch keine URLs."
+        )
+        return
+
+    text = "🔗 Deine überwachten URLs\n\n"
+
+    for index, row in enumerate(results, start=1):
+        text += f"{index}. {row[0]}\n\n"
+
+    await update.message.reply_text(text)
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     job_queue = app.job_queue
@@ -974,6 +1000,7 @@ def main():
     app.add_handler(CommandHandler("setalert", setalert))
     app.add_handler(CommandHandler("setdrops", setdrops))
     app.add_handler(CommandHandler("trackurl", trackurl))
+    app.add_handler(CommandHandler("myurls", myurls))
     print("Bot läuft...")
     app.run_polling()
 

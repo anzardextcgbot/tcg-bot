@@ -1121,6 +1121,56 @@ async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
                     chat_id=user_id,
                     text=text
                 )
+async def untrackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Benutze: /untrackurl NUMMER"
+        )
+        return
+
+    user_id = str(update.effective_user.id)
+
+    try:
+        index = int(context.args[0]) - 1
+    except:
+        await update.message.reply_text(
+            "Bitte eine gültige Nummer angeben."
+        )
+        return
+
+    cursor.execute(
+        """
+        SELECT url
+        FROM tracked_urls
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    urls = cursor.fetchall()
+
+    if index < 0 or index >= len(urls):
+        await update.message.reply_text(
+            "Ungültige Nummer."
+        )
+        return
+
+    url = urls[index][0]
+
+    cursor.execute(
+        """
+        DELETE FROM tracked_urls
+        WHERE user_id = ? AND url = ?
+        """,
+        (user_id, url)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        "🗑 URL entfernt."
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1160,6 +1210,7 @@ def main():
     app.add_handler(CommandHandler("myurls", myurls))
     app.add_handler(CommandHandler("checkurl", checkurl))
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
+    app.add_handler(CommandHandler("untrackurl", untrackurl))
 
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

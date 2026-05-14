@@ -1016,6 +1016,38 @@ async def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "⚠️ Seite konnte nicht geprüft werden."
         )
+async def check_my_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT url
+        FROM tracked_urls
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    urls = cursor.fetchall()
+
+    if not urls:
+        await update.message.reply_text("Du hast keine URLs gespeichert.")
+        return
+
+    text = "🔍 URL-Check\n\n"
+
+    for row in urls:
+        url = row[0]
+        result = check_restock(url)
+
+        if result is True:
+            text += f"✅ Verfügbar:\n{url}\n\n"
+        elif result is False:
+            text += f"❌ Ausverkauft:\n{url}\n\n"
+        else:
+            text += f"⚠️ Konnte nicht prüfen:\n{url}\n\n"
+
+    await update.message.reply_text(text)
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     job_queue = app.job_queue
@@ -1048,6 +1080,7 @@ def main():
     app.add_handler(CommandHandler("trackurl", trackurl))
     app.add_handler(CommandHandler("myurls", myurls))
     app.add_handler(CommandHandler("checkurl", checkurl))
+    app.add_handler(CommandHandler("checkmyurls", check_my_urls))
     print("Bot läuft...")
     app.run_polling()
 

@@ -1105,7 +1105,6 @@ def main():
     app.add_handler(CommandHandler("checkprice", checkprice))
     app.add_handler(CommandHandler("watchsets", watchsets))
     app.add_handler(CommandHandler("alertcheck", alertcheck))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
     app.add_handler(CommandHandler("alerttest", alerttest))
     app.add_handler(CommandHandler("track", track))
     app.add_handler(CommandHandler("meinekarten", meinekarten))
@@ -1116,6 +1115,10 @@ def main():
     app.add_handler(CommandHandler("myurls", myurls))
     app.add_handler(CommandHandler("checkurl", checkurl))
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
+
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
+    )
 
     print("Bot läuft...")
 

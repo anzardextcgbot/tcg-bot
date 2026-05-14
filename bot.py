@@ -16,8 +16,9 @@ from telegram.ext import (
    JobQueue
 )
 
-BOT_TOKEN = "8283670732:AAF4eMGiGKCX_xsjKyyn-Oixn0P_j4ATR-0"
+import os
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 last_search_results = {}
 
 conn = sqlite3.connect("tcg.db", check_same_thread=False)

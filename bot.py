@@ -970,6 +970,52 @@ async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{index}. {row[0]}\n\n"
 
     await update.message.reply_text(text)
+def check_restock(url):
+    try:
+        response = requests.get(url, timeout=10)
+
+        html = response.text.lower()
+
+        sold_out_words = [
+            "out of stock",
+            "sold out",
+            "nicht verfügbar",
+            "ausverkauft"
+        ]
+
+        for word in sold_out_words:
+            if word in html:
+                return False
+
+        return True
+
+    except Exception:
+        return None
+async def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Benutze: /checkurl LINK"
+        )
+        return
+
+    url = context.args[0]
+
+    result = check_restock(url)
+
+    if result is True:
+        await update.message.reply_text(
+            "✅ Produkt vermutlich verfügbar!"
+        )
+
+    elif result is False:
+        await update.message.reply_text(
+            "❌ Produkt aktuell ausverkauft."
+        )
+
+    else:
+        await update.message.reply_text(
+            "⚠️ Seite konnte nicht geprüft werden."
+        )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     job_queue = app.job_queue
@@ -1001,6 +1047,7 @@ def main():
     app.add_handler(CommandHandler("setdrops", setdrops))
     app.add_handler(CommandHandler("trackurl", trackurl))
     app.add_handler(CommandHandler("myurls", myurls))
+    app.add_handler(CommandHandler("checkurl", checkurl))
     print("Bot läuft...")
     app.run_polling()
 

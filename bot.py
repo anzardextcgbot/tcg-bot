@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS tracked_urls (
 """)
 
 conn.commit()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS restock_status (
+    url TEXT,
+    last_status TEXT
+)
+""")
+
+conn.commit()
 def search_pokemon_card(card_name):
     url = "https://api.pokemontcg.io/v2/cards"
 
@@ -1066,11 +1074,53 @@ async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
 
         result = check_restock(url)
 
-        if result is True:
-            text = (
-                "🚨 RESTOCK ERKANNT!\n\n"
-                f"{url}"
+                cursor.execute(
+            """
+            SELECT last_status
+            FROM restock_status
+            WHERE url = ?
+            """,
+            (url,)
+        )
+
+        existing = cursor.fetchone()
+
+        old_status = None
+
+        if existing:
+            old_status = existing[0]
+
+        new_status = "available" if result else "soldout"
+
+        if old_status != new_status:
+            cursor.execute(
+                """
+                DELETE FROM restock_status
+                WHERE url = ?
+                """,
+                (url,)
             )
+
+            cursor.execute(
+                """
+                INSERT INTO restock_status (url, last_status)
+                VALUES (?, ?)
+                """,
+                (url, new_status)
+            )
+
+            conn.commit()
+
+            if new_status == "available":
+                text = (
+                    "🚨 RESTOCK ERKANNT!\n\n"
+                    f"{url}"
+                )
+
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=text
+                )
 
             await context.bot.send_message(
                 chat_id=user_id,

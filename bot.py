@@ -1048,12 +1048,46 @@ async def check_my_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"⚠️ Konnte nicht prüfen:\n{url}\n\n"
 
     await update.message.reply_text(text)
+async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
+    print("🔄 Restock-Check läuft...")
+
+    cursor.execute(
+        """
+        SELECT user_id, url
+        FROM tracked_urls
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    for row in rows:
+        user_id = row[0]
+        url = row[1]
+
+        result = check_restock(url)
+
+        if result is True:
+            text = (
+                "🚨 RESTOCK ERKANNT!\n\n"
+                f"{url}"
+            )
+
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text
+            )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     job_queue = app.job_queue
 
-    job_queue.run_repeating(
+ job_queue.run_repeating(
     auto_price_check,
+    interval=300,
+    first=10
+)
+
+job_queue.run_repeating(
+    auto_restock_check,
     interval=300,
     first=10
 )

@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS user_settings (
 """)
 
 conn.commit()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tracked_urls (
+    user_id TEXT,
+    url TEXT
+)
+""")
+
+conn.commit()
 def search_pokemon_card(card_name):
     url = "https://api.pokemontcg.io/v2/cards"
 
@@ -912,6 +920,30 @@ async def setdrops(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"✅ Nur Preis-Drops: {'aktiviert' if only_drops == 'yes' else 'deaktiviert'}"
     )
+async def trackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Benutze: /trackurl LINK"
+        )
+        return
+
+    url = context.args[0]
+
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        INSERT INTO tracked_urls (user_id, url)
+        VALUES (?, ?)
+        """,
+        (user_id, url)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        "✅ URL wird jetzt überwacht."
+    )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     job_queue = app.job_queue
@@ -941,6 +973,7 @@ def main():
     app.add_handler(CommandHandler("checktracked", checktracked))
     app.add_handler(CommandHandler("setalert", setalert))
     app.add_handler(CommandHandler("setdrops", setdrops))
+    app.add_handler(CommandHandler("trackurl", trackurl))
     print("Bot läuft...")
     app.run_polling()
 

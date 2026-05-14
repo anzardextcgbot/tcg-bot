@@ -1078,7 +1078,8 @@ async def auto_restock_check(context: ContextTypes.DEFAULT_TYPE):
             )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-       job_queue = app.job_queue
+
+    job_queue = app.job_queue
 
     job_queue.run_repeating(
         auto_price_check,
@@ -1115,7 +1116,9 @@ def main():
     app.add_handler(CommandHandler("myurls", myurls))
     app.add_handler(CommandHandler("checkurl", checkurl))
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
+
     print("Bot läuft...")
+
     app.run_polling()
 
 

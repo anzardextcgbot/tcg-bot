@@ -220,7 +220,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     score += 3
 
                 if word == card_number:
-                    score += 5
+                    score += 10
 
         filtered_cards.append((score, card))
 

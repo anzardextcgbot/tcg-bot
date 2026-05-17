@@ -340,18 +340,34 @@ async def send_card_details(message, card):
         f"💰 <b>Low Price:</b> {low_price} €\n"
         f"📈 <b>Trend Price:</b> {trend_price} €\n"
         f"🏪 <b>Durchschnitt:</b> {average_sell_price} €"
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "⭐ Tracken",
+                callback_data=f"track_{name}"
+            ),
+            InlineKeyboardButton(
+                "📈 Verlauf",
+                callback_data=f"history_{name}"
+            )
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
     )
 
     if image_url:
         await message.reply_photo(
             photo=image_url,
             caption=text,
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
     else:
         await message.reply_text(
             text,
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
 
 async def set_search(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -155,39 +155,39 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
-   query = " ".join(context.args)
+    query = " ".join(context.args)
 
-search_words = query.lower().split()
+    if not query:
+        await update.message.reply_text("Benutze: /preis pikachu")
+        return
 
-card_name = query
-
-if not card_name:
-    await update.message.reply_text("Benutze: /preis pikachu")
-    return
+    search_words = query.lower().split()
+    card_name = query
 
     cards = search_pokemon_card(card_name)
-filtered_cards = []
 
-for card in cards:
-    card_text = (
-        f"{card.get('name', '')} "
-        f"{card.get('set', {}).get('name', '')} "
-        f"{card.get('number', '')}"
-    ).lower()
+    filtered_cards = []
 
-    score = 0
+    for card in cards:
+        card_text = (
+            f"{card.get('name', '')} "
+            f"{card.get('set', {}).get('name', '')} "
+            f"{card.get('number', '')}"
+        ).lower()
 
-    for word in search_words:
-        if word in card_text:
-            score += 1
+        score = 0
 
-    filtered_cards.append((score, card))
+        for word in search_words:
+            if word in card_text:
+                score += 1
 
-filtered_cards.sort(reverse=True, key=lambda x: x[0])
+        filtered_cards.append((score, card))
 
-cards = [card for score, card in filtered_cards]
-user_id = str(update.effective_user.id)
-last_search_results[user_id] = cards
+    filtered_cards.sort(reverse=True, key=lambda x: x[0])
+    cards = [card for score, card in filtered_cards]
+
+    user_id = str(update.effective_user.id)
+    last_search_results[user_id] = cards
 
     if not cards:
         await update.message.reply_text("Keine Karte gefunden.")
@@ -208,7 +208,7 @@ last_search_results[user_id] = cards
         if trend_price:
             save_price(name, trend_price)
 
-        keyboard = []
+    keyboard = []
 
     for index, card in enumerate(cards, start=1):
         keyboard.append(

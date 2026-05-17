@@ -364,7 +364,7 @@ async def send_card_details(message, card):
 
     keyboard = [
         [
-            InlineKeyboardButton("⭐ Tracken", callback_data=f"track_{name}"),
+            InlineKeyboardButton("⭐ Track / Untrack", callback_data=f"track_{name}")
             InlineKeyboardButton("📈 Verlauf", callback_data=f"history_{name}")
         ]
     ]
@@ -1313,18 +1313,19 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         existing = cursor.fetchone()
 
-        if existing:
-            await query.message.reply_text("🃏 Diese Karte wird bereits beobachtet.")
-            return
+       if existing:
+    cursor.execute(
+        """
+        DELETE FROM tracked_cards
+        WHERE user_id = ? AND card_name = ?
+        """,
+        (user_id, card_name)
+    )
 
-        cursor.execute(
-            "INSERT INTO tracked_cards (user_id, card_name) VALUES (?, ?)",
-            (user_id, card_name)
-        )
+    conn.commit()
 
-        conn.commit()
-
-        await query.message.reply_text(f"✅ Karte wird beobachtet: {card_name}")
+    await query.message.reply_text(f"❌ Tracking entfernt: {card_name}")
+    return
 
     elif data.startswith("history_"):
         card_name = data.replace("history_", "")

@@ -161,9 +161,9 @@ search_words = query.lower().split()
 
 card_name = query
 
-    if not card_name:
-        await update.message.reply_text("Benutze: /preis pikachu")
-        return
+if not card_name:
+    await update.message.reply_text("Benutze: /preis pikachu")
+    return
 
     cards = search_pokemon_card(card_name)
 filtered_cards = []

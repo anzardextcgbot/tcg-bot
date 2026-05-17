@@ -220,13 +220,13 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     score += 3
 
                 if word == card_number:
-                    score += 10
+                    score += 5
 
         filtered_cards.append((score, card))
 
     filtered_cards.sort(reverse=True, key=lambda x: x[0])
 
-    cards = [card for score, card in filtered_cards[:5]]
+    cards = [card for score, card in filtered_cards[:10]]
 
     user_id = str(update.effective_user.id)
 

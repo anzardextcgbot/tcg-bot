@@ -1366,7 +1366,9 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
         for price, checked_at in results:
             text += f"💰 {price} € — {checked_at}\n"
 
-        await query.message.reply_text(text)def load_all_sets():
+        await query.message.reply_text(text)
+
+def load_all_sets():
     url = "https://api.pokemontcg.io/v2/sets"
 
     response = requests.get(url)

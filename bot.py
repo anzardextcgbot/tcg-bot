@@ -185,6 +185,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     card_name = search_words[0]
 
     cards = search_pokemon_card(card_name)
+
     if matched_set:
         cards = [
             card for card in cards
@@ -226,10 +227,9 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     filtered_cards.sort(reverse=True, key=lambda x: x[0])
 
-    cards = [card for score, card in filtered_cards[:10]]
+    cards = [card for score, card in filtered_cards[:5]]
 
     user_id = str(update.effective_user.id)
-
     last_search_results[user_id] = cards
 
     if not cards:
@@ -237,11 +237,8 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(cards) == 1:
-    card = cards[0]
-
-    await send_card_details(update.message, card)
-
-    return
+        await send_card_details(update.message, cards[0])
+        return
 
     keyboard = []
 
@@ -260,8 +257,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🔍 Ergebnisse für: {query}",
         reply_markup=reply_markup
-    )
-async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 
     if user_id not in last_search_results:

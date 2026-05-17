@@ -362,6 +362,8 @@ async def send_card_details(message, card):
         f"📊 <b>Durchschnitt:</b> {average_sell_price} €"
     )
 
+    cardmarket_url = card.get("cardmarket", {}).get("url")
+
     keyboard = [
         [
             InlineKeyboardButton(
@@ -374,6 +376,16 @@ async def send_card_details(message, card):
             )
         ]
     ]
+
+    if cardmarket_url:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "🛒 Cardmarket",
+                    url=cardmarket_url
+                )
+            ]
+        )
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -390,6 +402,7 @@ async def send_card_details(message, card):
             parse_mode="HTML",
             reply_markup=reply_markup
         )
+
 async def set_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_name = " ".join(context.args)
 

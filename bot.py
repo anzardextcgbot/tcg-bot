@@ -237,33 +237,11 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(cards) == 1:
-        card = cards[0]
+    card = cards[0]
 
-        image = card.get("images", {}).get("large")
+    await send_card_details(update.message, card)
 
-        name = card.get("name")
-        set_name = card.get("set", {}).get("name")
-        number = card.get("number")
-
-        price = (
-            card.get("cardmarket", {})
-            .get("prices", {})
-            .get("trendPrice", "?")
-        )
-
-        text = (
-            f"🃏 {name}\n"
-            f"📦 Set: {set_name}\n"
-            f"#️⃣ Nummer: {number}\n"
-            f"💰 Preis: {price} €"
-        )
-
-        await update.message.reply_photo(
-            photo=image,
-            caption=text
-        )
-
-        return
+    return
 
     keyboard = []
 

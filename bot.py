@@ -176,7 +176,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     filtered_cards = []
 
-    for card in cards:
+      for card in cards:
         card_text = (
             f"{card.get('name', '')} "
             f"{card.get('set', {}).get('name', '')} "
@@ -184,20 +184,22 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ).lower()
 
         score = 0
-if card.get("name", "").lower() == card_name.lower():
-    score += 5
-       for word in search_words:
-           if word in card_text:
-               score += 1
 
-               set_name = card.get("set", {}).get("name", "").lower()
-               card_number = card.get("number", "").lower()
+        if card.get("name", "").lower() == card_name.lower():
+            score += 10
 
-               if word in set_name:
-               score += 3
+        for word in search_words:
+            if word in card_text:
+                score += 1
 
-               if word == card_number:
-                   score += 5
+                set_name = card.get("set", {}).get("name", "").lower()
+                card_number = card.get("number", "").lower()
+
+                if word in set_name:
+                    score += 3
+
+                if word == card_number:
+                    score += 5
 
         filtered_cards.append((score, card))
 

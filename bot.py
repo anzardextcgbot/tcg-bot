@@ -1318,19 +1318,28 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         existing = cursor.fetchone()
 
-       if existing:
-    cursor.execute(
-        """
-        DELETE FROM tracked_cards
-        WHERE user_id = ? AND card_name = ?
-        """,
-        (user_id, card_name)
-    )
+        if existing:
+            cursor.execute(
+                """
+                DELETE FROM tracked_cards
+                WHERE user_id = ? AND card_name = ?
+                """,
+                (user_id, card_name)
+            )
 
-    conn.commit()
+            conn.commit()
 
-    await query.message.reply_text(f"❌ Tracking entfernt: {card_name}")
-    return
+            await query.message.reply_text(f"❌ Tracking entfernt: {card_name}")
+            return
+
+        cursor.execute(
+            "INSERT INTO tracked_cards (user_id, card_name) VALUES (?, ?)",
+            (user_id, card_name)
+        )
+
+        conn.commit()
+
+        await query.message.reply_text(f"✅ Karte wird beobachtet: {card_name}")
 
     elif data.startswith("history_"):
         card_name = data.replace("history_", "")
@@ -1357,9 +1366,7 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
         for price, checked_at in results:
             text += f"💰 {price} € — {checked_at}\n"
 
-        await query.message.reply_text(text)
-
-def load_all_sets():
+        await query.message.reply_text(text)def load_all_sets():
     url = "https://api.pokemontcg.io/v2/sets"
 
     response = requests.get(url)

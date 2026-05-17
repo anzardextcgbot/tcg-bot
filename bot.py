@@ -87,7 +87,7 @@ def search_pokemon_card(card_name):
 
     params = {
         "q": f'name:"{card_name}"',
-        "pageSize": 10
+        "pageSize": 250
     }
 
     response = requests.get(url, params=params)
@@ -185,6 +185,11 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     card_name = search_words[0]
 
     cards = search_pokemon_card(card_name)
+    if matched_set:
+        cards = [
+            card for card in cards
+            if matched_set in card.get("set", {}).get("name", "").lower()
+        ]
 
     filtered_cards = []
 

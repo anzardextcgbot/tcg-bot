@@ -1276,6 +1276,62 @@ async def untrackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🗑 URL entfernt."
     )
+async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = str(query.from_user.id)
+    data = query.data
+
+    if data.startswith("track_"):
+        card_name = data.replace("track_", "")
+
+        cursor.execute(
+            "SELECT * FROM tracked_cards WHERE user_id = ? AND card_name = ?",
+            (user_id, card_name)
+        )
+
+        existing = cursor.fetchone()
+
+        if existing:
+            await query.message.reply_text("🃏 Diese Karte wird bereits beobachtet.")
+            return
+
+        cursor.execute(
+            "INSERT INTO tracked_cards (user_id, card_name) VALUES (?, ?)",
+            (user_id, card_name)
+        )
+
+        conn.commit()
+
+        await query.message.reply_text(f"✅ Karte wird beobachtet: {card_name}")
+
+    elif data.startswith("history_"):
+        card_name = data.replace("history_", "")
+
+        cursor.execute(
+            """
+            SELECT price, checked_at
+            FROM price_history
+            WHERE card_name = ?
+            ORDER BY checked_at DESC
+            LIMIT 5
+            """,
+            (card_name,)
+        )
+
+        results = cursor.fetchall()
+
+        if not results:
+            await query.message.reply_text("Noch keine Preise gespeichert.")
+            return
+
+        text = f"📈 Preisverlauf für {card_name}\n\n"
+
+        for price, checked_at in results:
+            text += f"💰 {price} € — {checked_at}\n"
+
+        await query.message.reply_text(text)
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -1317,6 +1373,7 @@ def main():
     app.add_handler(CommandHandler("checkurl", checkurl))
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
     app.add_handler(CommandHandler("untrackurl", untrackurl))
+    app.add_handler(CallbackQueryHandler(action_button_handler, pattern="^(track_|history_)"))
 
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

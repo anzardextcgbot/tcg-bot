@@ -170,13 +170,14 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     search_words = query.lower().split()
+
     card_name = search_words[0]
 
     cards = search_pokemon_card(card_name)
 
     filtered_cards = []
 
-      for card in cards:
+    for card in cards:
         card_text = (
             f"{card.get('name', '')} "
             f"{card.get('set', {}).get('name', '')} "
@@ -204,50 +205,35 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         filtered_cards.append((score, card))
 
     filtered_cards.sort(reverse=True, key=lambda x: x[0])
+
     cards = [card for score, card in filtered_cards[:5]]
 
     user_id = str(update.effective_user.id)
+
     last_search_results[user_id] = cards
 
     if not cards:
         await update.message.reply_text("Keine Karte gefunden.")
         return
 
-    text = f"🔍 Gefunden für: {card_name}\n\n"
-
-    for index, card in enumerate(cards, start=1):
-        name = card.get("name")
-        set_name = card.get("set", {}).get("name")
-        number = card.get("number", "?")
-
-        text += f"{index}. 🃏 {name} — {set_name} #{number}\n"
-
-        prices = card.get("cardmarket", {}).get("prices", {})
-        trend_price = prices.get("trendPrice")
-
-        if trend_price:
-            save_price(name, trend_price)
-
     keyboard = []
 
     for index, card in enumerate(cards, start=1):
         keyboard.append(
             [
-           
                 InlineKeyboardButton(
-    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')} | {card.get('cardmarket', {}).get('prices', {}).get('trendPrice', '?')}€",
-    callback_data=f"select_{index}"
+                    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')} | {card.get('cardmarket', {}).get('prices', {}).get('trendPrice', '?')}€",
+                    callback_data=f"select_{index}"
                 )
             ]
         )
+
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        text,
+        f"🔍 Ergebnisse für: {query}",
         reply_markup=reply_markup
     )
-
-
 async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 

@@ -1318,7 +1318,7 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         existing = cursor.fetchone()
 
-        if existing:
+                if existing:
             cursor.execute(
                 """
                 DELETE FROM tracked_cards
@@ -1329,7 +1329,10 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
             conn.commit()
 
-            await query.message.reply_text(f"❌ Tracking entfernt: {card_name}")
+            await query.message.reply_text(
+                f"❌ Tracking entfernt: {card_name}"
+            )
+
             return
 
         cursor.execute(
@@ -1413,6 +1416,7 @@ async def mycards(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"🃏 {row[0]}\n"
 
     await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

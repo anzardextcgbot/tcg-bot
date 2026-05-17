@@ -257,7 +257,9 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🔍 Ergebnisse für: {query}",
         reply_markup=reply_markup
-    )async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )
+
+async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 
     if user_id not in last_search_results:

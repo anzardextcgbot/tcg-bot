@@ -1389,6 +1389,30 @@ def load_all_sets():
 
 ALL_SETS = load_all_sets()
 
+async def mycards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT card_name
+        FROM tracked_cards
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    results = cursor.fetchall()
+
+    if not results:
+        await update.message.reply_text("Du trackst noch keine Karten.")
+        return
+
+    text = "⭐ Deine getrackten Karten:\n\n"
+
+    for row in results:
+        text += f"🃏 {row[0]}\n"
+
+    await update.message.reply_text(text)
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1430,7 +1454,7 @@ def main():
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
     app.add_handler(CommandHandler("untrackurl", untrackurl))
     app.add_handler(CallbackQueryHandler(action_button_handler, pattern="^(track_|history_)"))
-
+    app.add_handler(CommandHandler("mycards", mycards))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

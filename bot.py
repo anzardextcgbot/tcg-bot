@@ -771,7 +771,7 @@ async def alerttest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📉 Gefallen um 10.00 €"
     )
 async def auto_price_check(context: ContextTypes.DEFAULT_TYPE):
-    print("🔄 Automatische Preisprüfung läuft...")
+    print("📉 Automatische Preisprüfung läuft...")
 
     cursor.execute(
         "SELECT user_id, card_name FROM tracked_cards"
@@ -847,6 +847,43 @@ async def auto_price_check(context: ContextTypes.DEFAULT_TYPE):
         if only_drops == "yes" and difference > 0:
             continue
 
+        cursor.execute(
+            """
+            SELECT last_price
+            FROM sent_price_alerts
+            WHERE card_name = ?
+            """,
+            (card_name,)
+        )
+
+        existing = cursor.fetchone()
+
+        old_alert_price = None
+
+        if existing:
+            old_alert_price = existing[0]
+
+        if old_alert_price == new_price:
+            continue
+
+        cursor.execute(
+            """
+            DELETE FROM sent_price_alerts
+            WHERE card_name = ?
+            """,
+            (card_name,)
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO sent_price_alerts (card_name, last_price)
+            VALUES (?, ?)
+            """,
+            (card_name, new_price)
+        )
+
+        conn.commit()
+
         if difference > 0:
             status = f"📈 Gestiegen um {difference} €"
         else:
@@ -858,42 +895,7 @@ async def auto_price_check(context: ContextTypes.DEFAULT_TYPE):
             f"💰 Neuer Preis: {new_price} €\n\n"
             f"{status}"
         )
-                cursor.execute(
-                    """
-                    SELECT last_price
-                    FROM sent_price_alerts
-                    WHERE card_name = ?
-                    """,
-                    (card_name,)
-                )
 
-                existing = cursor.fetchone()
-
-                old_price = None
-
-                if existing:
-                    old_price = existing[0]
-
-                if old_price == new_price:
-                    continue
-
-                cursor.execute(
-                    """
-                    DELETE FROM sent_price_alerts
-                    WHERE card_name = ?
-                    """,
-                    (card_name,)
-                )
-
-                cursor.execute(
-                    """
-                    INSERT INTO sent_price_alerts (card_name, last_price)
-                    VALUES (?, ?)
-                    """,
-                    (card_name, new_price)
-                )
-
-                conn.commit()
         await context.bot.send_message(
             chat_id=user_id,
             text=text

@@ -174,6 +174,14 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     search_words = query.lower().split()
 
+matched_set = None
+
+for set_name in ALL_SETS.keys():
+    for word in search_words:
+        if word in set_name:
+            matched_set = set_name
+            break
+
     card_name = search_words[0]
 
     cards = search_pokemon_card(card_name)
@@ -197,6 +205,8 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 score += 1
 
                 set_name = card.get("set", {}).get("name", "").lower()
+if matched_set and matched_set in set_name:
+    score += 10
                 card_number = card.get("number", "").lower()
 
                 if word in set_name:
@@ -1335,6 +1345,27 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
             text += f"💰 {price} € — {checked_at}\n"
 
         await query.message.reply_text(text)
+
+def load_all_sets():
+    url = "https://api.pokemontcg.io/v2/sets"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return {}
+
+    data = response.json()
+
+    sets = {}
+
+    for s in data.get("data", []):
+        name = s.get("name", "").lower()
+
+        sets[name] = s.get("id")
+
+    return sets
+
+ALL_SETS = load_all_sets()
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

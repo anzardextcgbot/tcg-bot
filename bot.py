@@ -160,7 +160,10 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/checkprice pikachu\n"
             "/preishistory Pikachu"
         )
+    else:
+        context.args = update.message.text.split()
 
+        await preis(update, context)
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

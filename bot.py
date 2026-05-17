@@ -74,6 +74,14 @@ CREATE TABLE IF NOT EXISTS restock_status (
 """)
 
 conn.commit()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sent_price_alerts (
+    card_name TEXT,
+    last_price REAL
+)
+""")
+
+conn.commit()
 def search_pokemon_card(card_name):
     url = "https://api.pokemontcg.io/v2/cards"
 
@@ -850,7 +858,42 @@ async def auto_price_check(context: ContextTypes.DEFAULT_TYPE):
             f"💰 Neuer Preis: {new_price} €\n\n"
             f"{status}"
         )
+                cursor.execute(
+                    """
+                    SELECT last_price
+                    FROM sent_price_alerts
+                    WHERE card_name = ?
+                    """,
+                    (card_name,)
+                )
 
+                existing = cursor.fetchone()
+
+                old_price = None
+
+                if existing:
+                    old_price = existing[0]
+
+                if old_price == new_price:
+                    continue
+
+                cursor.execute(
+                    """
+                    DELETE FROM sent_price_alerts
+                    WHERE card_name = ?
+                    """,
+                    (card_name,)
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO sent_price_alerts (card_name, last_price)
+                    VALUES (?, ?)
+                    """,
+                    (card_name, new_price)
+                )
+
+                conn.commit()
         await context.bot.send_message(
             chat_id=user_id,
             text=text

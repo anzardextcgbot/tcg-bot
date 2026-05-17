@@ -155,14 +155,37 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    card_name = " ".join(context.args)
+   query = " ".join(context.args)
+
+search_words = query.lower().split()
+
+card_name = query
 
     if not card_name:
         await update.message.reply_text("Benutze: /preis pikachu")
         return
 
     cards = search_pokemon_card(card_name)
+filtered_cards = []
 
+for card in cards:
+    card_text = (
+        f"{card.get('name', '')} "
+        f"{card.get('set', {}).get('name', '')} "
+        f"{card.get('number', '')}"
+    ).lower()
+
+    score = 0
+
+    for word in search_words:
+        if word in card_text:
+            score += 1
+
+    filtered_cards.append((score, card))
+
+filtered_cards.sort(reverse=True, key=lambda x: x[0])
+
+cards = [card for score, card in filtered_cards]
     user_id = str(update.effective_user.id)
     last_search_results[user_id] = cards
 

@@ -1318,7 +1318,7 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         existing = cursor.fetchone()
 
-                if existing:
+        if existing:
             cursor.execute(
                 """
                 DELETE FROM tracked_cards
@@ -1342,7 +1342,9 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         conn.commit()
 
-        await query.message.reply_text(f"✅ Karte wird beobachtet: {card_name}")
+        await query.message.reply_text(
+            f"✅ Karte wird beobachtet: {card_name}"
+        )
 
     elif data.startswith("history_"):
         card_name = data.replace("history_", "")
@@ -1361,7 +1363,9 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
         results = cursor.fetchall()
 
         if not results:
-            await query.message.reply_text("Noch keine Preise gespeichert.")
+            await query.message.reply_text(
+                "Noch keine Preise gespeichert."
+            )
             return
 
         text = f"📈 Preisverlauf für {card_name}\n\n"

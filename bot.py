@@ -174,13 +174,13 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     search_words = query.lower().split()
 
-matched_set = None
+    matched_set = None
 
-for set_name in ALL_SETS.keys():
-    for word in search_words:
-        if word in set_name:
-            matched_set = set_name
-            break
+    for set_name in ALL_SETS.keys():
+        for word in search_words:
+            if word in set_name:
+                matched_set = set_name
+                break
 
     card_name = search_words[0]
 
@@ -189,33 +189,33 @@ for set_name in ALL_SETS.keys():
     filtered_cards = []
 
     for card in cards:
-    card_text = (
-        f"{card.get('name', '')} "
-        f"{card.get('set', {}).get('name', '')} "
-        f"{card.get('number', '')}"
-    ).lower()
+        card_text = (
+            f"{card.get('name', '')} "
+            f"{card.get('set', {}).get('name', '')} "
+            f"{card.get('number', '')}"
+        ).lower()
 
-    score = 0
+        score = 0
 
-    if card.get("name", "").lower() == card_name.lower():
-        score += 10
+        if card.get("name", "").lower() == card_name.lower():
+            score += 10
 
-    for word in search_words:
-        if word in card_text:
-            score += 1
+        for word in search_words:
+            if word in card_text:
+                score += 1
 
-            set_name = card.get("set", {}).get("name", "").lower()
+                set_name = card.get("set", {}).get("name", "").lower()
 
-            if matched_set and matched_set in set_name:
-                score += 10
+                if matched_set and matched_set in set_name:
+                    score += 10
 
-            card_number = card.get("number", "").lower()
+                card_number = card.get("number", "").lower()
 
-            if word in set_name:
-                score += 3
+                if word in set_name:
+                    score += 3
 
-            if word == card_number:
-                score += 5
+                if word == card_number:
+                    score += 5
 
         filtered_cards.append((score, card))
 

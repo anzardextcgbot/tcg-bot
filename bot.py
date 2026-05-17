@@ -216,6 +216,35 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Keine Karte gefunden.")
         return
 
+    if len(cards) == 1:
+        card = cards[0]
+
+        image = card.get("images", {}).get("large")
+
+        name = card.get("name")
+        set_name = card.get("set", {}).get("name")
+        number = card.get("number")
+
+        price = (
+            card.get("cardmarket", {})
+            .get("prices", {})
+            .get("trendPrice", "?")
+        )
+
+        text = (
+            f"🃏 {name}\n"
+            f"📦 Set: {set_name}\n"
+            f"#️⃣ Nummer: {number}\n"
+            f"💰 Preis: {price} €"
+        )
+
+        await update.message.reply_photo(
+            photo=image,
+            caption=text
+        )
+
+        return
+
     keyboard = []
 
     for index, card in enumerate(cards, start=1):
@@ -227,40 +256,12 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             ]
         )
-if len(cards) == 1:
-    card = cards[0]
 
-    image = card.get("images", {}).get("large")
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    name = card.get("name")
-    set_name = card.get("set", {}).get("name")
-    number = card.get("number")
-
-    price = (
-        card.get("cardmarket", {})
-        .get("prices", {})
-        .get("trendPrice", "?")
-    )
-
-    text = (
-        f"🃏 {name}\n"
-        f"📦 Set: {set_name}\n"
-        f"#️⃣ Nummer: {number}\n"
-        f"💰 Preis: {price} €"
-    )
-
-    await update.message.reply_photo(
-        photo=image,
-        caption=text
-    )
-
-    return
-
-reply_markup = InlineKeyboardMarkup(keyboard)
-
-await update.message.reply_text(
-    f"🔍 Ergebnisse für: {query}",
-    reply_markup=reply_markup
+    await update.message.reply_text(
+        f"🔍 Ergebnisse für: {query}",
+        reply_markup=reply_markup
     )
 async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)

@@ -332,14 +332,16 @@ async def send_card_details(message, card):
     low_price = prices.get("lowPrice", "Keine Daten")
     average_sell_price = prices.get("averageSellPrice", "Keine Daten")
 
-    text = (
+       text = (
         f"🃏 <b>{name}</b>\n\n"
         f"📦 <b>Set:</b> {set_name}\n"
-        f"🔢 <b>Nummer:</b> {number}\n"
+        f"#️⃣ <b>Nummer:</b> {number}\n"
         f"✨ <b>Seltenheit:</b> {rarity}\n\n"
         f"💰 <b>Low Price:</b> {low_price} €\n"
-        f"📈 <b>Trend Price:</b> {trend_price} €\n"
-        f"🏪 <b>Durchschnitt:</b> {average_sell_price} €"
+        f"📉 <b>Trend Price:</b> {trend_price} €\n"
+        f"📊 <b>Durchschnitt:</b> {average_sell_price} €"
+    )
+
     keyboard = [
         [
             InlineKeyboardButton(

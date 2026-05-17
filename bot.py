@@ -82,34 +82,27 @@ CREATE TABLE IF NOT EXISTS sent_price_alerts (
 """)
 
 conn.commit()
-def search_pokemon_card(card_name):
+def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
 
+    query = f'name:"{card_name}"'
+
+    if set_name:
+        query += f' set.name:"{set_name}"'
+
     params = {
-        "q": f'name:"{card_name}"',
-        "pageSize": 250
+        "q": query,
+        "pageSize": 50
     }
 
     response = requests.get(url, params=params)
+
+    if response.status_code != 200:
+        return []
+
     data = response.json()
 
     return data.get("data", [])
-
-
-def save_price(card_name, price):
-    from datetime import datetime
-
-    cursor.execute(
-        "INSERT INTO price_history (card_name, price, checked_at) VALUES (?, ?, ?)",
-        (
-            card_name,
-            price,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
-    )
-
-    conn.commit()
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -184,7 +177,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     card_name = search_words[0]
 
-    cards = search_pokemon_card(card_name)
+    cards = search_pokemon_card(card_name, matched_set)
 
     if matched_set:
         cards = [

@@ -170,7 +170,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     search_words = query.lower().split()
-    card_name = query
+    card_name = search_words[0]
 
     cards = search_pokemon_card(card_name)
 
@@ -184,15 +184,25 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ).lower()
 
         score = 0
+if card.get("name", "").lower() == card_name.lower():
+    score += 5
+       for word in search_words:
+           if word in card_text:
+               score += 1
 
-        for word in search_words:
-            if word in card_text:
-                score += 1
+               set_name = card.get("set", {}).get("name", "").lower()
+               card_number = card.get("number", "").lower()
+
+               if word in set_name:
+               score += 3
+
+               if word == card_number:
+                   score += 5
 
         filtered_cards.append((score, card))
 
     filtered_cards.sort(reverse=True, key=lambda x: x[0])
-    cards = [card for score, card in filtered_cards]
+    cards = [card for score, card in filtered_cards[:5]]
 
     user_id = str(update.effective_user.id)
     last_search_results[user_id] = cards
@@ -221,13 +231,13 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for index, card in enumerate(cards, start=1):
         keyboard.append(
             [
+           
                 InlineKeyboardButton(
-                    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')}",
-                    callback_data=f"select_{index}"
+    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')} | {card.get('cardmarket', {}).get('prices', {}).get('trendPrice', '?')}€",
+    callback_data=f"select_{index}"
                 )
             ]
         )
-
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(

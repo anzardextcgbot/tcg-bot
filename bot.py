@@ -185,16 +185,18 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if trend_price:
             save_price(name, trend_price)
 
-    keyboard = []
+        keyboard = []
 
     for index, card in enumerate(cards, start=1):
         keyboard.append(
             [
-
                 InlineKeyboardButton(
-    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')}",
-    callback_data=f"select_{index}"
-)
+                    f"{index}. {card.get('name')} | {card.get('set', {}).get('name', 'Unbekannt')} | #{card.get('number', '?')}",
+                    callback_data=f"select_{index}"
+                )
+            ]
+        )
+
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(

@@ -1421,6 +1421,23 @@ async def mycards(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def untrackcards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        DELETE FROM tracked_cards
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        "❌ Alle getrackten Karten wurden entfernt."
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1463,6 +1480,8 @@ def main():
     app.add_handler(CommandHandler("untrackurl", untrackurl))
     app.add_handler(CallbackQueryHandler(action_button_handler, pattern="^(track_|history_)"))
     app.add_handler(CommandHandler("mycards", mycards))
+    app.add_handler(CommandHandler("untrackcards", untrackcards))
+
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

@@ -169,6 +169,18 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     matched_set = None
 
+      if "lost origin" in query.lower():
+       matched_set = "lost origin"
+
+      if "silver tempest" in query.lower():
+       matched_set = "silver tempest"
+
+      if "evolving skies" in query.lower():
+       matched_set = "evolving skies"
+
+      if "151" in query.lower():
+       matched_set = "scarlet & violet 151"
+
     for set_name in ALL_SETS.keys():
         for word in search_words:
             if word in set_name:

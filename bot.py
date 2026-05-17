@@ -186,8 +186,8 @@ for card in cards:
 filtered_cards.sort(reverse=True, key=lambda x: x[0])
 
 cards = [card for score, card in filtered_cards]
-    user_id = str(update.effective_user.id)
-    last_search_results[user_id] = cards
+user_id = str(update.effective_user.id)
+last_search_results[user_id] = cards
 
     if not cards:
         await update.message.reply_text("Keine Karte gefunden.")

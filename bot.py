@@ -255,11 +255,12 @@ if len(cards) == 1:
     )
 
     return
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(
-        f"🔍 Ergebnisse für: {query}",
-        reply_markup=reply_markup
+reply_markup = InlineKeyboardMarkup(keyboard)
+
+await update.message.reply_text(
+    f"🔍 Ergebnisse für: {query}",
+    reply_markup=reply_markup
     )
 async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)

@@ -1427,6 +1427,28 @@ async def untrackcards(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ Alle getrackten Karten wurden entfernt."
     )
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "🤖 Pokémon TCG Bot Hilfe\n\n"
+
+        "🔍 Karten suchen:\n"
+        "charizard 151\n"
+        "/preis pikachu\n\n"
+
+        "⭐ Tracking:\n"
+        "⭐ Button unter Karten drücken\n"
+        "/mycards\n"
+        "/untrackcards\n\n"
+
+        "📈 Preise:\n"
+        "/preishistory Charizard\n\n"
+
+        "🛒 Cardmarket:\n"
+        "Direkt unter jeder Karte verfügbar"
+    )
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1470,6 +1492,7 @@ def main():
     app.add_handler(CallbackQueryHandler(action_button_handler, pattern="^(track_|history_)"))
     app.add_handler(CommandHandler("mycards", mycards))
     app.add_handler(CommandHandler("untrackcards", untrackcards))
+    app.add_handler(CommandHandler("help", help_command))
 
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

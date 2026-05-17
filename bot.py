@@ -332,7 +332,7 @@ async def send_card_details(message, card):
     low_price = prices.get("lowPrice", "Keine Daten")
     average_sell_price = prices.get("averageSellPrice", "Keine Daten")
 
-       text = (
+    text = (
         f"🃏 <b>{name}</b>\n\n"
         f"📦 <b>Set:</b> {set_name}\n"
         f"#️⃣ <b>Nummer:</b> {number}\n"
@@ -344,19 +344,12 @@ async def send_card_details(message, card):
 
     keyboard = [
         [
-            InlineKeyboardButton(
-                "⭐ Tracken",
-                callback_data=f"track_{name}"
-            ),
-            InlineKeyboardButton(
-                "📈 Verlauf",
-                callback_data=f"history_{name}"
-            )
+            InlineKeyboardButton("⭐ Tracken", callback_data=f"track_{name}"),
+            InlineKeyboardButton("📈 Verlauf", callback_data=f"history_{name}")
         ]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    )
 
     if image_url:
         await message.reply_photo(

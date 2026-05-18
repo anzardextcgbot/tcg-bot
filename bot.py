@@ -129,62 +129,55 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "🃏 Karte suchen":
-        await update.message.reply_text("🔍 Schreibe:\n/preis pikachu")
-
-    elif text == "📦 Sets":
-        await update.message.reply_text("📦 Schreibe:\n/set 151")
-
-    elif text == "⭐ Favoriten":
+    if text == "🔍 Karten suchen":
         await update.message.reply_text(
-            "⭐ Favoriten-Menü\n\n"
-            "/favset 151\n"
-            "/meinesets\n"
-            "/unfavset 151"
+            "🔍 Sende einfach einen Kartennamen.\n\n"
+            "Beispiele:\n"
+            "charizard 151\n"
+            "umbreon vmax evolving skies"
         )
 
-    elif text == "🔔 Alerts":
+    elif text == "⭐ Tracking":
         await update.message.reply_text(
-            "🔔 Alert-Menü\n\n"
-            "/watchsets\n"
-            "/alertcheck"
+            "⭐ Tracking-Menü\n\n"
+            "/mycards\n"
+            "/untrackcards"
         )
 
     elif text == "📈 Preise":
         await update.message.reply_text(
             "📈 Preis-Menü\n\n"
-            "/checkprice pikachu\n"
-            "/preishistory Pikachu"
+            "/preishistory Charizard"
         )
 
-   else:
-    text_lower = text.lower()
-
-    product_keywords = [
-        "etb",
-        "display",
-        "booster",
-        "bundle",
-        "tin",
-        "mini tin",
-        "upc",
-        "case",
-        "collection"
-    ]
-
-    is_product = False
-
-    for keyword in product_keywords:
-        if keyword in text_lower:
-            is_product = True
-            break
-
-    context.args = update.message.text.split()
-
-    if is_product:
-        await product_search(update, context)
     else:
-        await preis(update, context)
+        text_lower = text.lower()
+
+        product_keywords = [
+            "etb",
+            "display",
+            "booster",
+            "bundle",
+            "tin",
+            "mini tin",
+            "upc",
+            "case",
+            "collection"
+        ]
+
+        is_product = False
+
+        for keyword in product_keywords:
+            if keyword in text_lower:
+                is_product = True
+                break
+
+        context.args = update.message.text.split()
+
+        if is_product:
+            await product_search(update, context)
+        else:
+            await preis(update, context)
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

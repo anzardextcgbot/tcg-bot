@@ -169,23 +169,19 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     matched_set = None
 
-    if "lost origin" in query.lower():
-        matched_set = "lost origin"
+    query_lower = query.lower()
 
-    if "silver tempest" in query.lower():
-        matched_set = "silver tempest"
-
-    if "evolving skies" in query.lower():
-        matched_set = "evolving skies"
-
-    if "151" in query.lower():
-        matched_set = "scarlet & violet 151"
+    best_match = ""
 
     for set_name in ALL_SETS.keys():
-        for word in search_words:
-            if word in set_name:
-                matched_set = set_name
-                break
+        if set_name in query_lower and len(set_name) > len(best_match):
+            best_match = set_name
+
+    if best_match:
+        matched_set = best_match
+
+    if "151" in query_lower:
+        matched_set = "scarlet & violet 151"
 
     card_name_words = []
 

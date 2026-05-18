@@ -156,9 +156,34 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/checkprice pikachu\n"
             "/preishistory Pikachu"
         )
-    else:
-        context.args = update.message.text.split()
 
+   else:
+    text_lower = text.lower()
+
+    product_keywords = [
+        "etb",
+        "display",
+        "booster",
+        "bundle",
+        "tin",
+        "mini tin",
+        "upc",
+        "case",
+        "collection"
+    ]
+
+    is_product = False
+
+    for keyword in product_keywords:
+        if keyword in text_lower:
+            is_product = True
+            break
+
+    context.args = update.message.text.split()
+
+    if is_product:
+        await product_search(update, context)
+    else:
         await preis(update, context)
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1457,6 +1482,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = " ".join(context.args)
+
+    await update.message.reply_text(
+        "📦 Produktsuche erkannt:\n\n"
+        f"{query}\n\n"
+        "Sealed-Produkte wie ETBs, Displays, Booster Bundles, Mini Tins und Cases bauen wir jetzt separat ein."
+    )
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

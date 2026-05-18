@@ -199,12 +199,6 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cards = search_pokemon_card(card_name, matched_set)
 
-    if matched_set:
-        cards = [
-            card for card in cards
-            if matched_set in card.get("set", {}).get("name", "").lower()
-        ]
-
     filtered_cards = []
 
     for card in cards:

@@ -1523,6 +1523,7 @@ def main():
     app.add_handler(CommandHandler("mycards", mycards))
     app.add_handler(CommandHandler("untrackcards", untrackcards))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
 
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

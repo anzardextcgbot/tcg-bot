@@ -255,7 +255,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cards = [card for score, card in filtered_cards[:5]]
 
-    user_id = str(update.effective_user.id)
+    user_id = str(update.message.from_user.id)
     last_search_results[user_id] = cards
 
     if not cards:
@@ -309,7 +309,7 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = str(query.from_user.id)
+    user_id = str(query.message.chat.id)
 
     choice = int(query.data.replace("select_", ""))
 

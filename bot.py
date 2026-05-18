@@ -307,16 +307,23 @@ async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+
     await query.answer()
 
-    user_id = str(query.message.chat.id)
-
-    choice = int(query.data.replace("select_", ""))
+    user_id = str(query.from_user.id)
 
     cards = last_search_results.get(user_id)
 
     if not cards:
-        await query.message.reply_text("Bitte suche zuerst eine Karte mit /preis pikachu")
+        await query.message.reply_text(
+            "Bitte suche zuerst eine Karte mit /preis pikachu"
+        )
+        return
+
+    try:
+        choice = int(query.data.replace("select_", ""))
+    except:
+        await query.message.reply_text("Ungültige Auswahl.")
         return
 
     if choice < 1 or choice > len(cards):
@@ -326,19 +333,6 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     card = cards[choice - 1]
 
     await send_card_details(query.message, card)
-
-
-async def send_selected_card(update: Update, user_id, choice):
-    cards = last_search_results[user_id]
-
-    if choice < 1 or choice > len(cards):
-        await update.message.reply_text("Diese Nummer gibt es nicht.")
-        return
-
-    card = cards[choice - 1]
-
-    await send_card_details(update.message, card)
-
 
 async def send_card_details(message, card):
     name = card.get("name")

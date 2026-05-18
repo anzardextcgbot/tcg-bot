@@ -171,7 +171,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if "lost origin" in query.lower():
         matched_set = "lost origin"
-      
+
     if "silver tempest" in query.lower():
         matched_set = "silver tempest"
 
@@ -187,7 +187,15 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 matched_set = set_name
                 break
 
-    card_name = search_words[0]
+    card_name_words = []
+
+    for word in search_words:
+        if matched_set and word in matched_set:
+            break
+
+        card_name_words.append(word)
+
+    card_name = " ".join(card_name_words)
 
     cards = search_pokemon_card(card_name, matched_set)
 
@@ -235,6 +243,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cards = [card for score, card in filtered_cards[:5]]
 
     user_id = str(update.effective_user.id)
+
     last_search_results[user_id] = cards
 
     if not cards:

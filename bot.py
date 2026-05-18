@@ -181,7 +181,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         matched_set = best_match
 
     if "151" in query_lower:
-        matched_set = "scarlet & violet 151"
+        matched_set = "sv3pt5"
 
     card_name_words = []
 

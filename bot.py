@@ -166,11 +166,9 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     search_words = query.lower().split()
-
-    matched_set = None
-
     query_lower = query.lower()
 
+    matched_set = None
     best_match = ""
 
     for set_name in ALL_SETS.keys():
@@ -181,12 +179,15 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         matched_set = best_match
 
     if "151" in query_lower:
-        matched_set = "sv3pt5"
+        matched_set = "scarlet & violet 151"
 
     card_name_words = []
 
     for word in search_words:
         if matched_set and word in matched_set:
+            break
+
+        if word == "151":
             break
 
         card_name_words.append(word)
@@ -239,7 +240,6 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cards = [card for score, card in filtered_cards[:5]]
 
     user_id = str(update.effective_user.id)
-
     last_search_results[user_id] = cards
 
     if not cards:

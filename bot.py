@@ -88,6 +88,9 @@ def search_pokemon_card(card_name, set_name=None):
     query = f'name:"{card_name}"'
 
     if set_name:
+    if set_name == "scarlet & violet 151":
+        query += ' set.id:sv3pt5'
+    else:
         query += f' set.name:"{set_name}"'
 
     params = {

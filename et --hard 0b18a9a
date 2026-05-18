@@ -1,0 +1,67 @@
+[33mb13c75a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m remove product detection temporary
+[33m35723ac[m restore text handler
+[33m0b18a9a[m restore text handler
+[33m64ca3ac[m add product search detection
+[33md94ecc2[m remove broken 151 local filter
+[33m37f68d3[m fix search pokemon card
+[33m4263c40[m fix 151 set search
+[33m97ad786[m restore preis function
+[33m7d81e96[m fix set detection
+[33m5573936[m fix set detection
+[33m0ff2671[m improve multi word card search
+[33m04382e1[m improve api card search
+[33m63ca544[m improve api card search
+[33m5fc44f2[m improve api card search
+[33m575228e[m add help command
+[33m58bca87[m fix preis single result buttons
+[33mffcbd61[m fix preis single result buttons
+[33m1dbd1de[m use card details for single result
+[33mb5159a4[m add cardmarket button
+[33m30ffc83[m add untrackcards command
+[33m79d7bb0[m fix track untrack toggle
+[33mabdac90[m fix track untrack toggle
+[33mac09070[m add mycards command
+[33mf8dc484[m fix action button handler
+[33mb70665d[m fix action button handler
+[33ma5f1614[m fix send card details buttons
+[33me1e71e2[m add track untrack toggle
+[33mde3513b[m add real set filtering
+[33m864f0be[m add real set filtering
+[33m5729451[m add real set filtering
+[33m91c0102[m fix automatic set matching
+[33m050a9e6[m fix automatic set matching
+[33mb98ae00[m add automatic set recognition
+[33mdd428fd[m add automatic set recognition
+[33mb8989cf[m add automatic text search
+[33m9e023be[m add card action button handlers
+[33m1032d57[m fix card detail buttons
+[33m12d97e4[m add action buttons
+[33m24017c7[m add action buttons
+[33mf3d612a[m fix single result auto display
+[33md15872c[m fix single result auto display
+[33m8fa46a6[m auto select single result
+[33ma1ef93a[m final smart preis function
+[33m5f54192[m fix smart search ranking
+[33m672154b[m improve search result ui
+[33ma92e2d0[m fix auto price check
+[33m7e96dba[m prevent price alert spam
+[33m94950ef[m fix preis function
+[33m9a4e1c1[m fix preis indentation
+[33m5feaeb8[m fix preis indentation
+[33md2e38c7[m improve smart card search
+[33m0ba20c4[m fix button brackets
+[33m0a5aa1c[m improve card search display
+[33me7430d2[m add untrackurl
+[33me2f1b27[m improve restock alerts
+[33m4e427de[m improve restock alerts
+[33me883a57[m full main reset
+[33m66affcc[m fix main indentation
+[33m6aa2a69[m add auto restock alerts
+[33mcbfc22c[m add auto restock alerts
+[33m9194730[m add checkmyurls
+[33m4281e99[m add restock checker
+[33m8ed7598[m add myurls command
+[33mefafcb7[m add url tracking
+[33m33ce25c[m requirements fix
+[33mb7df70a[m add requirements
+[33m20d6d34[m first bot version

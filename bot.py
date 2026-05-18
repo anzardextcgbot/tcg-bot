@@ -161,17 +161,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await preis(update, context)
 
-PRODUCT_KEYWORDS = [
-    "etb",
-    "display",
-    "booster",
-    "bundle",
-    "tin",
-    "mini tin",
-    "upc",
-    "case",
-    "collection"
-]
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
@@ -181,18 +170,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     search_words = query.lower().split()
 
-    is_product_search = False
-
-    for keyword in PRODUCT_KEYWORDS:
-        if keyword in query_lower:
-            is_product_search = True
-            break
-    if is_product_search:
-        await update.message.reply_text(
-            "📦 Produktsuche erkannt.\n\n"
-            "Sealed-Produkte wie ETBs, Displays, Booster Bundles, Mini Tins und Cases bauen wir als Nächstes vollständig ein."
-    )
-    return
+    query_lower = query.lower()
 
     matched_set = None
     best_match = ""

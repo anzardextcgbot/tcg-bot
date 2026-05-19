@@ -1466,9 +1466,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+PRODUCT_TYPES = {
+    "etb": "Top-Trainer-Box",
+    "display": "Display",
+    "booster bundle": "Booster Bundle",
+    "mini tin": "Mini Tin",
+    "tin": "Tin",
+    "case": "Case",
+    "upc": "Ultra Premium Collection",
+    "collection": "Kollektion"
+}
+
 SET_ALIASES = {
     "destined rivals": "ewige rivalen",
-    "journey together": "gemeinsames abenteuer",
+    "journey together": "Reisegefährten",
     "surging sparks": "stürmische funken",
     "stellar crown": "stellarkrone",
     "paradox rift": "paradoxrift",
@@ -1499,6 +1510,12 @@ def normalize_product_query(query):
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
+    product_type = "Produkt"
+
+    for keyword, display_name in PRODUCT_TYPES.items():
+        if keyword in query.lower():
+            product_type = display_name
+            break
 
     search_query = normalize_product_query(query)
 
@@ -1527,6 +1544,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"📦 <b>Produktsuche</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n\n"
+        f"📦 <b>Produkttyp:</b> {product_type}\n"
         f"🛒 Öffne Cardmarket über den Button.\n"
         f"🔔 Für Restock kannst du später Produktlinks speichern."
     )

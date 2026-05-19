@@ -1469,25 +1469,39 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
+    cardmarket_search_url = (
+        "https://www.cardmarket.com/de/Pokemon/Products/Search?idCategory=0&searchString="
+        + query.replace(" ", "+")
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🛒 Auf Cardmarket suchen",
+                url=cardmarket_search_url
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔔 Restock-Link hinzufügen",
+                callback_data="restock_help"
+            )
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     text = (
         f"📦 <b>Produktsuche</b>\n\n"
-        f"🔍 Suche nach:\n"
-        f"{query}\n\n"
-        f"🚧 Produktdatenbank wird jetzt aufgebaut.\n"
-        f"Demnächst:\n"
-        f"• ETBs\n"
-        f"• Displays\n"
-        f"• Booster Bundles\n"
-        f"• Mini Tins\n"
-        f"• Cases\n"
-        f"• Restock Alerts\n"
-        f"• Preise\n"
-        f"• Cardmarket Links"
+        f"🔍 <b>Gesucht:</b> {query}\n\n"
+        f"🛒 Öffne Cardmarket über den Button.\n"
+        f"🔔 Für Restock kannst du später Produktlinks speichern."
     )
 
     await update.message.reply_text(
         text,
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=reply_markup
     )
 
 def main():

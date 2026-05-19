@@ -1635,6 +1635,25 @@ def normalize_product_query(query):
 
     return q
 
+
+def get_product_price(query):
+    q = query.lower()
+
+    for product_name, price in PRODUCT_PRICES.items():
+        if product_name in q:
+
+            old_price = LAST_PRODUCT_PRICES.get(product_name)
+
+            LAST_PRODUCT_PRICES[product_name] = price
+
+            if old_price and old_price != price:
+                return f"{price} 📈 geändert"
+
+            return price
+
+    return "Noch keine Live-Daten"
+
+
 PRODUCT_PRICES = {
     "verlorener ursprung top trainer box": "ca. 45–60 €",
     "ewige rivalen top trainer box": "ca. 50–70 €",

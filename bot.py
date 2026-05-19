@@ -1466,8 +1466,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+SET_ALIASES = {
+    "destined rivals": "ewige rivalen",
+    "journey together": "gemeinsames abenteuer",
+    "surging sparks": "stürmische funken",
+    "stellar crown": "stellarkrone",
+    "paradox rift": "paradoxrift",
+    "temporal forces": "zeitliche mächte"
+}
+
 def normalize_product_query(query):
     q = query.lower()
+
+    for english_name, german_name in SET_ALIASES.items():
+        q = q.replace(english_name, german_name)
 
     replacements = {
         "etb": "top trainer box",
@@ -1478,13 +1490,13 @@ def normalize_product_query(query):
         "mini tin": "mini tin",
         "tin": "tin",
         "collection": "collection box"
-       
     }
 
     for short, full in replacements.items():
         q = q.replace(short, full)
 
     return q
+}
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

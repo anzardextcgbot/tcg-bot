@@ -254,6 +254,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filtered_cards.sort(reverse=True, key=lambda x: x[0])
 
     cards = [card for score, card in filtered_cards[:5]]
+    context.user_data["last_cards"] = cards
 
     user_id = str(update.message.from_user.id)
     last_search_results[user_id] = cards
@@ -307,17 +308,12 @@ async def select_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-
     await query.answer()
 
-    user_id = str(query.from_user.id)
-
-    cards = last_search_results.get(user_id)
+    cards = context.user_data.get("last_cards")
 
     if not cards:
-        await query.message.reply_text(
-            "Bitte suche zuerst eine Karte mit /preis pikachu"
-        )
+        await query.message.reply_text("Bitte suche zuerst eine Karte.")
         return
 
     try:
@@ -333,6 +329,7 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     card = cards[choice - 1]
 
     await send_card_details(query.message, card)
+
 
 async def send_card_details(message, card):
     name = card.get("name")

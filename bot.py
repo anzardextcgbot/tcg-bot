@@ -1660,15 +1660,7 @@ PRODUCT_PRICES = {
     "151 top trainer box": "ca. 80–120 €"
 }
 
-def get_product_price(query):
-    q = query.lower()
-
-    for product_name, price in PRODUCT_PRICES.items():
-        if product_name in q:
-            return price
-
-    return "Noch keine Live-Daten"
-
+LAST_PRODUCT_PRICES = {}
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

@@ -1493,6 +1493,23 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    job_queue = app.job_queue
+
+    job_queue.run_repeating(
+        auto_price_check,
+        interval=300,
+        first=10
+    )
+
+    job_queue.run_repeating(
+        auto_restock_check,
+        interval=300,
+        first=20
+    )
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("preis", preis))
     app.add_handler(CommandHandler("select", select_card))

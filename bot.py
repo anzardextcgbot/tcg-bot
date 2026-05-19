@@ -1478,7 +1478,6 @@ def normalize_product_query(query):
         "mini tin": "mini tin",
         "tin": "tin",
         "collection": "collection box"
-}
        
     }
 

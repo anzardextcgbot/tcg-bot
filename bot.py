@@ -1,6 +1,7 @@
 import sqlite3
 import requests
 import json
+
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -21,6 +22,15 @@ import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 last_search_results = {}
+
+def load_set_aliases():
+    try:
+        with open("set_aliases.json", "r", encoding="utf-8") as file:
+            return json.load(file)
+    except:
+        return {}
+
+SET_ALIASES = load_set_aliases()
 
 conn = sqlite3.connect("tcg.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -83,6 +93,8 @@ CREATE TABLE IF NOT EXISTS sent_price_alerts (
 """)
 
 conn.commit()
+
+
 def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
 
@@ -159,7 +171,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "display",
             "booster",
             "bundle",
-            "tin",
             "mini tin",
             "upc",
             "case",

@@ -1635,7 +1635,6 @@ def normalize_product_query(query):
 
     return q
 
-
 def get_product_price(query):
     q = query.lower()
 
@@ -1646,13 +1645,17 @@ def get_product_price(query):
 
             LAST_PRODUCT_PRICES[product_name] = price
 
+            if product_name not in PRODUCT_HISTORY:
+                PRODUCT_HISTORY[product_name] = []
+
+            PRODUCT_HISTORY[product_name].append(price)
+
             if old_price and old_price != price:
                 return f"{price} 📈 geändert"
 
             return price
 
     return "Noch keine Live-Daten"
-
 
 PRODUCT_PRICES = {
     "verlorener ursprung top trainer box": "ca. 45–60 €",
@@ -1661,6 +1664,7 @@ PRODUCT_PRICES = {
 }
 
 LAST_PRODUCT_PRICES = {}
+PRODUCT_HISTORY = {}
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

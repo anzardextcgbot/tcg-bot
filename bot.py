@@ -1666,6 +1666,17 @@ PRODUCT_PRICES = {
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
 
+
+def get_product_history(query):
+    q = query.lower()
+
+    for product_name, history in PRODUCT_HISTORY.items():
+        if product_name in q:
+            return history
+
+    return []
+
+
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     product_type = "Produkt"
@@ -1677,6 +1688,13 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     search_query = normalize_product_query(query)
     product_price = get_product_price(search_query)
+
+    product_history = get_product_history(search_query)
+
+    history_text = ""
+
+    if product_history:
+        history_text = "\n".join(product_history[-5:])
 
     cardmarket_search_url = (
         "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="
@@ -1706,6 +1724,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📦 <b>Produkttyp:</b> {product_type}\n"
         f"💰 <b>Preis:</b> {product_price}\n"
         f"📈 <b>Trend:</b> kommt als Nächstes\n\n"
+        f"📊 <b>Verlauf:</b>\n{history_text}\n\n"
         f"🛒 Öffne Cardmarket über den Button.\n"
         f"🔔 Für Restock kannst du später Produktlinks speichern."
 )

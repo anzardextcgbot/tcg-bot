@@ -1470,7 +1470,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     cardmarket_search_url = (
-        "https://www.cardmarket.com/de/Pokemon/Products/Search?idCategory=0&searchString="
+        "https://www.cardmarket.com/de/Pokemon/Products/Boosters/Search?searchString="
         + query.replace(" ", "+")
     )
 

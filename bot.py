@@ -1477,8 +1477,8 @@ def normalize_product_query(query):
         "booster bundle": "booster bundle",
         "mini tin": "mini tin",
         "tin": "tin",
-        "collection": "collection box",
-        "box": "collection box"
+        "collection": "collection box"
+       
     }
 
     for short, full in replacements.items():

@@ -1605,14 +1605,15 @@ SET_ALIASES = {
     "stellar crown": "stellarkrone",
     "surging sparks": "stürmische funken",
     "journey together": "reisegefährten",
-    "destined rivals": "ewige rivalen"
+    "destined rivals": "ewige rivalen",
 
     "mega evolution": "mega-entwicklung",
-    "ascended heroes": "erhabene helden",
-    "phantasmal flames": "fatale flammen",
+    "ascended heroes": "aufsteigende rivalen",
+    "fatal flames": "fatale flammen",
     "perfect order": "optimale ordnung",
-    "rising chaos": "wachsendes chaos"
+    "growing chaos": "wachsendes chaos"
 }
+
 def normalize_product_query(query):
     q = query.lower()
 

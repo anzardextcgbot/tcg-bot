@@ -1496,7 +1496,6 @@ def normalize_product_query(query):
         q = q.replace(short, full)
 
     return q
-}
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

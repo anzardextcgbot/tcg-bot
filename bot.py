@@ -1543,11 +1543,13 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         f"📦 <b>Produktsuche</b>\n\n"
-        f"🔍 <b>Gesucht:</b> {query}\n\n"
+        f"🔍 <b>Gesucht:</b> {query}\n"
         f"📦 <b>Produkttyp:</b> {product_type}\n"
+        f"💰 <b>Preis:</b> kommt als Nächstes\n"
+        f"📈 <b>Trend:</b> kommt als Nächstes\n\n"
         f"🛒 Öffne Cardmarket über den Button.\n"
         f"🔔 Für Restock kannst du später Produktlinks speichern."
-    )
+)
 
     await update.message.reply_text(
         text,

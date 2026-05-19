@@ -1489,7 +1489,7 @@ def normalize_product_query(query):
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
-       search_query = normalize_product_query(query)
+    search_query = normalize_product_query(query)
 
     cardmarket_search_url = (
         "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="

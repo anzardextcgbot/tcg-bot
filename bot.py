@@ -1466,12 +1466,34 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+def normalize_product_query(query):
+    q = query.lower()
+
+    replacements = {
+        "etb": "elite trainer box",
+        "display": "booster display",
+        "case": "sealed case",
+        "upc": "ultra premium collection",
+        "booster bundle": "booster bundle",
+        "mini tin": "mini tin",
+        "tin": "tin",
+        "collection": "collection box",
+        "box": "collection box"
+    }
+
+    for short, full in replacements.items():
+        q = q.replace(short, full)
+
+    return q
+
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
+       search_query = normalize_product_query(query)
+
     cardmarket_search_url = (
-        "https://www.cardmarket.com/de/Pokemon/Products/Boosters/Search?searchString="
-        + query.replace(" ", "+")
+        "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="
+        + search_query.replace(" ", "+")
     )
 
     keyboard = [

@@ -1608,10 +1608,10 @@ SET_ALIASES = {
     "destined rivals": "ewige rivalen",
 
     "mega evolution": "mega-entwicklung",
-    "ascended heroes": "aufsteigende rivalen",
-    "fatal flames": "fatale flammen",
+    "ascended heroes": "erhabene helden",
+    "phantasmal flames": "fatale flammen",
     "perfect order": "optimale ordnung",
-    "growing chaos": "wachsendes chaos"
+    "rising chaos": "wachsendes chaos"
 }
 
 def normalize_product_query(query):
@@ -1635,6 +1635,11 @@ def normalize_product_query(query):
 
     return q
 
+
+def get_product_price(query):
+    return "Noch keine Live-Daten"
+
+
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     product_type = "Produkt"
@@ -1645,6 +1650,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
 
     search_query = normalize_product_query(query)
+    product_price = get_product_price(search_query)
 
     cardmarket_search_url = (
         "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="
@@ -1672,7 +1678,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📦 <b>Produktsuche</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"📦 <b>Produkttyp:</b> {product_type}\n"
-        f"💰 <b>Preis:</b> kommt als Nächstes\n"
+        f"💰 <b>Preis:</b> {product_price}\n"
         f"📈 <b>Trend:</b> kommt als Nächstes\n\n"
         f"🛒 Öffne Cardmarket über den Button.\n"
         f"🔔 Für Restock kannst du später Produktlinks speichern."

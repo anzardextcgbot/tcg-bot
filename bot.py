@@ -1507,13 +1507,12 @@ def normalize_product_query(query):
     replacements = {
         "etb": "top trainer box",
         "display": "display",
-        "case": "6 display-karton"
+        "case": "6 display-karton",
         "upc": "ultra premium collection",
         "booster bundle": "booster bundle",
         "mini tin": "mini tin",
-        "tin": "tin",
         "collection": "collection box"
-    }
+}
 
     for short, full in replacements.items():
         q = q.replace(short, full)

@@ -1472,26 +1472,25 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
-    await update.message.reply_text(
-        "📦 Produktsuche erkannt:\n\n"
+    text = (
+        f"📦 <b>Produktsuche</b>\n\n"
+        f"🔍 Suche nach:\n"
         f"{query}\n\n"
-        "Sealed-Produkte wie ETBs, Displays, Booster Bundles, Mini Tins und Cases bauen wir jetzt separat ein."
+        f"🚧 Produktdatenbank wird jetzt aufgebaut.\n"
+        f"Demnächst:\n"
+        f"• ETBs\n"
+        f"• Displays\n"
+        f"• Booster Bundles\n"
+        f"• Mini Tins\n"
+        f"• Cases\n"
+        f"• Restock Alerts\n"
+        f"• Preise\n"
+        f"• Cardmarket Links"
     )
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
 
-    job_queue = app.job_queue
-
-    job_queue.run_repeating(
-        auto_price_check,
-        interval=300,
-        first=10
-    )
-
-    job_queue.run_repeating(
-        auto_restock_check,
-        interval=300,
-        first=20
+    await update.message.reply_text(
+        text,
+        parse_mode="HTML"
     )
 
     app.add_handler(CommandHandler("start", start))

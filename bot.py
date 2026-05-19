@@ -1507,7 +1507,7 @@ def normalize_product_query(query):
     replacements = {
         "etb": "top trainer box",
         "display": "display",
-        "case": "case",
+        "case": "6 display-karton"
         "upc": "ultra premium collection",
         "booster bundle": "booster bundle",
         "mini tin": "mini tin",

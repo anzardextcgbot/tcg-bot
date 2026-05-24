@@ -2060,14 +2060,7 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
     if not products:
         return
 
-    cursor.execute(
-        """
-        SELECT DISTINCT user_id
-        FROM tracked_products
-        """
-    )
 
-    users = cursor.fetchall()
 
     for product_name, shop_name, shop_url in products:
         status = check_restock(shop_url)
@@ -2075,8 +2068,18 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
         if status is not True:
             continue
 
-        for user in users:
-            user_id = user[0]
+               cursor.execute(
+            """
+            SELECT user_id, product_query
+            FROM tracked_products
+            """
+        )
+
+        tracked = cursor.fetchall()
+
+        for user_id, product_query in tracked:
+            if product_query.lower() not in product_name.lower():
+                continue
 
             text = (
                 "🚨 RESTOCK ALARM!\n\n"

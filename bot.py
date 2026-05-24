@@ -94,7 +94,6 @@ CREATE TABLE IF NOT EXISTS sent_price_alerts (
 
 conn.commit()
 
-cursor.execute("DROP TABLE IF EXISTS tracked_products")
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS tracked_products (
     user_id TEXT,

@@ -1823,6 +1823,42 @@ async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+async def checkproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT product_query
+        FROM tracked_products
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    products = cursor.fetchall()
+
+    if not products:
+        await update.message.reply_text(
+            "Du beobachtest noch keine Produkte."
+        )
+        return
+
+    text = "🔍 Produkt-Check\n\n"
+
+    for product in products:
+        query = product[0]
+        search_query = normalize_product_query(query)
+        price = get_product_price(search_query)
+        trend = get_product_trend(search_query)
+
+        text += (
+            f"📦 {query}\n"
+            f"💰 Preis: {price}\n"
+            f"📈 Trend: {trend}\n\n"
+        )
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1870,6 +1906,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
     app.add_handler(CommandHandler("trackproduct", trackproduct))
     app.add_handler(CommandHandler("myproducts", myproducts))
+    app.add_handler(CommandHandler("checkproducts", checkproducts))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

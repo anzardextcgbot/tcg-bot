@@ -1717,6 +1717,7 @@ PRODUCT_PRICES = {
 
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
+LAST_RESTOCK_ALERTS = {}
 
 def get_product_trend(query):
     q = query.lower()
@@ -2066,6 +2067,13 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
 
         if status is not True:
             continue
+
+        alert_key = f"{product_name}_{shop_name}"
+
+        if LAST_RESTOCK_ALERTS.get(alert_key) == "sent":
+            continue
+
+        LAST_RESTOCK_ALERTS[alert_key] = "sent"
 
         cursor.execute(
             """

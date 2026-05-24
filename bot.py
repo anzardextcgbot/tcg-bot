@@ -2233,6 +2233,30 @@ async def searchshops(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def findproductpages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = " ".join(context.args)
+
+    if not query:
+        await update.message.reply_text(
+            "Benutze: /findproductpages 151 etb"
+        )
+        return
+
+    search_query = normalize_product_query(query)
+    encoded_query = search_query.replace(" ", "+")
+
+    text = f"🔍 Mögliche Produktseiten für:\n{search_query}\n\n"
+
+    for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+        search_url = pattern.format(query=encoded_query)
+
+        text += (
+            f"🏪 {shop_name}\n"
+            f"🔗 {search_url}\n\n"
+        )
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2293,6 +2317,7 @@ def main():
     app.add_handler(CommandHandler("listshopproducts", listshopproducts))
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
     app.add_handler(CommandHandler("searchshops", searchshops))
+    app.add_handler(CommandHandler("findproductpages", findproductpages))
 
     app.add_handler(
 

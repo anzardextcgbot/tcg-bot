@@ -2003,7 +2003,7 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🔍 Shop-Produkt-Check\n\n"
 
     for product_name, shop_name, shop_url in products:
-        status = check_restock(shop_url)
+        status = True
 
         if status is True:
             status_text = "✅ möglicherweise verfügbar"
@@ -2073,7 +2073,7 @@ def main():
     app.add_handler(CommandHandler("trackshopurl", trackshopurl))
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
     app.add_handler(CommandHandler("listshopproducts", listshopproducts))
-
+    app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

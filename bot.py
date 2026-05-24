@@ -94,6 +94,15 @@ CREATE TABLE IF NOT EXISTS sent_price_alerts (
 
 conn.commit()
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tracked_products (
+    user_id TEXT,
+    product_query TEXT
+)
+""")
+
+conn.commit()
+
 
 def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
@@ -1758,6 +1767,31 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = " ".join(context.args)
+
+    if not query:
+        await update.message.reply_text(
+            "Benutze: /trackproduct lost origin etb"
+        )
+        return
+
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        INSERT INTO tracked_products (user_id, product_query)
+        VALUES (?, ?)
+        """,
+        (user_id, query)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        f"🔔 Produkt wird beobachtet:\n{query}"
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1803,6 +1837,7 @@ def main():
     app.add_handler(CommandHandler("untrackcards", untrackcards))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+    app.add_handler(CommandHandler("trackproduct", trackproduct))
 
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

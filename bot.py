@@ -2191,13 +2191,16 @@ async def searchshops(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = f"🔍 Shop-Suchlinks für:\n{search_query}\n\n"
 
-    for shop_name, shop_url in SHOPS.items():
-        search_url = f"{shop_url}/search?search={encoded_query}"
+    for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
 
-        text += f"🏪 {shop_name}\n{search_url}\n\n"
+        search_url = pattern.format(query=encoded_query)
+
+        text += (
+            f"🏪 {shop_name}\n"
+            f"{search_url}\n\n"
+        )
 
     await update.message.reply_text(text)
-
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

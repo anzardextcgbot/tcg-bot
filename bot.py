@@ -1957,6 +1957,33 @@ async def addshopproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🏪 {shop_name}"
     )
 
+async def listshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cursor.execute(
+        """
+        SELECT product_name, shop_name, shop_url
+        FROM global_shop_products
+        """
+    )
+
+    products = cursor.fetchall()
+
+    if not products:
+        await update.message.reply_text(
+            "Noch keine globalen Shop-Produkte gespeichert."
+        )
+        return
+
+    text = "🌍 Globale Shop-Produkte:\n\n"
+
+    for product_name, shop_name, shop_url in products:
+        text += (
+            f"📦 {product_name}\n"
+            f"🏪 {shop_name}\n"
+            f"🛒 {shop_url}\n\n"
+        )
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2008,7 +2035,10 @@ def main():
     app.add_handler(CommandHandler("restocktest", restocktest))
     app.add_handler(CommandHandler("trackshopurl", trackshopurl))
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
+    app.add_handler(CommandHandler("listshopproducts", listshopproducts))
+
     app.add_handler(
+
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )
 

@@ -1749,6 +1749,37 @@ PRODUCT_PRICES = {
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
 LAST_RESTOCK_ALERTS = {}
+SHOP_SEARCH_PATTERNS = {
+    "Gate to the Games":
+        "https://www.gate-to-the-games.de/search?sSearch={query}",
+
+    "Cardbuddys":
+        "https://cardbuddys.de/search?sSearch={query}",
+
+    "Games Island":
+        "https://games-island.eu/search?sSearch={query}",
+
+    "Trader Online":
+        "https://www.trader-online.de/search?sSearch={query}",
+
+    "Amazon":
+        "https://www.amazon.de/s?k={query}",
+
+    "eBay":
+        "https://www.ebay.de/sch/i.html?_nkw={query}",
+
+    "Smyths":
+        "https://www.smythstoys.com/de/de-de/search/?text={query}",
+
+    "Müller":
+        "https://www.mueller.de/search/?query={query}",
+
+    "GameStop":
+        "https://www.gamestop.de/SearchResult/QuickSearch?q={query}",
+
+    "Chaos Cards":
+        "https://www.chaoscards.co.uk/search/{query}"
+}
 SHOPS = {
     "Gate to the Games": "https://www.gate-to-the-games.de",
     "Cardbuddys": "https://cardbuddys.de",

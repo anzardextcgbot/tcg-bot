@@ -103,6 +103,15 @@ CREATE TABLE IF NOT EXISTS tracked_products (
 
 conn.commit()
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tracked_shop_urls (
+    user_id TEXT,
+    product_name TEXT,
+    shop_url TEXT
+)
+""")
+
+conn.commit()
 
 def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
@@ -1868,6 +1877,37 @@ async def checkproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def trackshopurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+
+    if len(args) < 2:
+        await update.message.reply_text(
+            "Benutze:\n/trackshopurl PRODUKTNAME URL"
+        )
+        return
+
+    product_name = " ".join(args[:-1])
+    shop_url = args[-1]
+
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        INSERT INTO tracked_shop_urls
+        (user_id, product_name, shop_url)
+        VALUES (?, ?, ?)
+        """,
+        (user_id, product_name, shop_url)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        f"🔔 Shop-URL gespeichert:\n\n"
+        f"📦 {product_name}\n"
+        f"🛒 {shop_url}"
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -1917,6 +1957,8 @@ def main():
     app.add_handler(CommandHandler("myproducts", myproducts))
     app.add_handler(CommandHandler("checkproducts", checkproducts))
     app.add_handler(CommandHandler("restocktest", restocktest))
+    app.add_handler(CommandHandler("trackshopurl", trackshopurl))
+
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

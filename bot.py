@@ -1754,7 +1754,7 @@ SHOP_SEARCH_PATTERNS = {
         "https://www.gate-to-the-games.de/search?sSearch={query}",
 
     "Cardbuddys":
-        "https://cardbuddys.de/search?sSearch={query}",
+        "https://cardbuddys.de/search?search={query}",
 
     "Games Island":
         "https://games-island.eu/search?sSearch={query}",

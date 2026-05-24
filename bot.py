@@ -1984,6 +1984,43 @@ async def listshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cursor.execute(
+        """
+        SELECT product_name, shop_name, shop_url
+        FROM global_shop_products
+        """
+    )
+
+    products = cursor.fetchall()
+
+    if not products:
+        await update.message.reply_text(
+            "Keine globalen Shop-Produkte gespeichert."
+        )
+        return
+
+    text = "🔍 Shop-Produkt-Check\n\n"
+
+    for product_name, shop_name, shop_url in products:
+        status = check_restock(shop_url)
+
+        if status is True:
+            status_text = "✅ möglicherweise verfügbar"
+        elif status is False:
+            status_text = "❌ wahrscheinlich ausverkauft"
+        else:
+            status_text = "⚠️ konnte nicht geprüft werden"
+
+        text += (
+            f"📦 {product_name}\n"
+            f"🏪 {shop_name}\n"
+            f"{status_text}\n"
+            f"🛒 {shop_url}\n\n"
+        )
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

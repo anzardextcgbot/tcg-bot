@@ -2177,6 +2177,22 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
                 text=text
             )
 
+async def searchshops(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = " ".join(context.args)
+
+    if not query:
+        await update.message.reply_text(
+            "Benutze: /searchshops 151 etb"
+        )
+        return
+
+    text = f"🔍 Shop-Suche vorbereitet für:\n{query}\n\n"
+
+    for shop_name, shop_url in SHOPS.items():
+        text += f"🏪 {shop_name}\n{shop_url}\n\n"
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2236,7 +2252,7 @@ def main():
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
     app.add_handler(CommandHandler("listshopproducts", listshopproducts))
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
-
+    app.add_handler(CommandHandler("searchshops", searchshops))
 
     app.add_handler(
 

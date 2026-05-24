@@ -2063,35 +2063,35 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
 
 
     for product_name, shop_name, shop_url in products:
-        status = check_restock(shop_url)
+    status = check_restock(shop_url)
 
-        if status is not True:
+    if status is not True:
+        continue
+
+    cursor.execute(
+        """
+        SELECT user_id, product_query
+        FROM tracked_products
+        """
+    )
+
+    tracked = cursor.fetchall()
+
+    for user_id, product_query in tracked:
+        if product_query.lower() not in product_name.lower():
             continue
 
-               cursor.execute(
-            """
-            SELECT user_id, product_query
-            FROM tracked_products
-            """
+        text = (
+            "🚨 RESTOCK ALARM!\n\n"
+            f"📦 {product_name}\n"
+            f"🏪 {shop_name}\n"
+            f"🛒 {shop_url}"
         )
 
-        tracked = cursor.fetchall()
-
-        for user_id, product_query in tracked:
-            if product_query.lower() not in product_name.lower():
-                continue
-
-            text = (
-                "🚨 RESTOCK ALARM!\n\n"
-                f"📦 {product_name}\n"
-                f"🏪 {shop_name}\n"
-                f"🛒 {shop_url}"
-            )
-
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text
-            )
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text
+        )
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

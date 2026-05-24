@@ -1155,9 +1155,16 @@ async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{index}. {row[0]}\n\n"
 
     await update.message.reply_text(text)
+
 def check_restock(url):
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(
+            url,
+            timeout=10,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
 
         html = response.text.lower()
 
@@ -1165,17 +1172,34 @@ def check_restock(url):
             "out of stock",
             "sold out",
             "nicht verfügbar",
-            "ausverkauft"
+            "ausverkauft",
+            "derzeit nicht verfügbar",
+            "momentan nicht verfügbar"
+        ]
+
+        available_words = [
+            "in den warenkorb",
+            "warenkorb",
+            "add to cart",
+            "buy now",
+            "kaufen",
+            "verfügbar",
+            "auf lager"
         ]
 
         for word in sold_out_words:
             if word in html:
                 return False
 
-        return True
+        for word in available_words:
+            if word in html:
+                return True
+
+        return None
 
     except Exception:
         return None
+
 async def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(

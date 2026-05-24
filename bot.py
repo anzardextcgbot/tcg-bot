@@ -1156,6 +1156,37 @@ async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+def extract_shop_price(url):
+    try:
+        response = requests.get(
+            url,
+            timeout=10,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        html = response.text
+
+        import re
+
+        price_patterns = [
+            r"\d+,\d{2}\s?€",
+            r"€\s?\d+,\d{2}",
+            r"\d+\.\d{2}\s?€"
+        ]
+
+        for pattern in price_patterns:
+            match = re.search(pattern, html)
+
+            if match:
+                return match.group(0)
+
+        return "Preis nicht gefunden"
+
+    except Exception:
+        return "Preis nicht gefunden"
+
 def check_restock(url):
     try:
         response = requests.get(
@@ -2028,12 +2059,17 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🔍 Shop-Produkt-Check\n\n"
 
     for product_name, shop_name, shop_url in products:
-        status = True
+
+        status = check_restock(shop_url)
+
+        price = extract_shop_price(shop_url)
 
         if status is True:
             status_text = "✅ möglicherweise verfügbar"
+
         elif status is False:
             status_text = "❌ wahrscheinlich ausverkauft"
+
         else:
             status_text = "⚠️ konnte nicht geprüft werden"
 
@@ -2041,6 +2077,7 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📦 {product_name}\n"
             f"🏪 {shop_name}\n"
             f"{status_text}\n"
+            f"💰 Preis: {price}\n"
             f"🛒 {shop_url}\n\n"
         )
 
@@ -2064,11 +2101,16 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
     for product_name, shop_name, shop_url in products:
 
         status = check_restock(shop_url)
-
-        if status is not True:
-            continue
+        
 
         alert_key = f"{product_name}_{shop_name}"
+
+        if status is not True:
+
+            if LAST_RESTOCK_ALERTS.get(alert_key) == "sent":
+                LAST_RESTOCK_ALERTS.pop(alert_key)
+
+            continue
 
         if LAST_RESTOCK_ALERTS.get(alert_key) == "sent":
             continue
@@ -2100,6 +2142,7 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
                 chat_id=user_id,
                 text=text
             )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

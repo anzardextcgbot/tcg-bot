@@ -113,6 +113,16 @@ CREATE TABLE IF NOT EXISTS tracked_shop_urls (
 
 conn.commit()
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS global_shop_products (
+    product_name TEXT,
+    shop_name TEXT,
+    shop_url TEXT
+)
+""")
+
+conn.commit()
+
 def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
 
@@ -1907,6 +1917,45 @@ async def trackshopurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📦 {product_name}\n"
         f"🛒 {shop_url}"
     )
+async def addshopproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+
+    if len(args) < 3:
+        await update.message.reply_text(
+            "Benutze:\n/addshopproduct PRODUKT | SHOP | URL"
+        )
+        return
+
+    full_text = " ".join(args)
+
+    parts = full_text.split("|")
+
+    if len(parts) != 3:
+        await update.message.reply_text(
+            "Format:\n/addshopproduct PRODUKT | SHOP | URL"
+        )
+        return
+
+    product_name = parts[0].strip()
+    shop_name = parts[1].strip()
+    shop_url = parts[2].strip()
+
+    cursor.execute(
+        """
+        INSERT INTO global_shop_products
+        (product_name, shop_name, shop_url)
+        VALUES (?, ?, ?)
+        """,
+        (product_name, shop_name, shop_url)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        f"✅ Produkt gespeichert\n\n"
+        f"📦 {product_name}\n"
+        f"🏪 {shop_name}"
+    )
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -1958,7 +2007,7 @@ def main():
     app.add_handler(CommandHandler("checkproducts", checkproducts))
     app.add_handler(CommandHandler("restocktest", restocktest))
     app.add_handler(CommandHandler("trackshopurl", trackshopurl))
-
+    app.add_handler(CommandHandler("addshopproduct", addshopproduct))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

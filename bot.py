@@ -1666,6 +1666,28 @@ PRODUCT_PRICES = {
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
 
+def get_product_trend(query):
+    q = query.lower()
+
+    for product_name, history in PRODUCT_HISTORY.items():
+        if product_name in q:
+
+            if len(history) < 2:
+                return "➖ stabil"
+
+            latest = history[-1]
+            previous = history[-2]
+
+            if latest > previous:
+                return "📈 steigend"
+
+            elif latest < previous:
+                return "📉 fallend"
+
+            else:
+                return "➖ stabil"
+
+    return "➖ unbekannt"
 
 def get_product_history(query):
     q = query.lower()
@@ -1690,6 +1712,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product_price = get_product_price(search_query)
 
     product_history = get_product_history(search_query)
+    product_trend = get_product_trend(search_query)
 
     history_text = ""
 
@@ -1723,7 +1746,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"📦 <b>Produkttyp:</b> {product_type}\n"
         f"💰 <b>Preis:</b> {product_price}\n"
-        f"📈 <b>Trend:</b> kommt als Nächstes\n\n"
+        f"📈 <b>Trend:</b> {product_trend}\n\n"
         f"📊 <b>Verlauf:</b>\n{history_text}\n\n"
         f"🛒 Öffne Cardmarket über den Button.\n"
         f"🔔 Für Restock kannst du später Produktlinks speichern."

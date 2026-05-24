@@ -1749,6 +1749,40 @@ PRODUCT_PRICES = {
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
 LAST_RESTOCK_ALERTS = {}
+SHOPS = {
+    "Gate to the Games": "https://www.gate-to-the-games.de",
+    "Cardbuddys": "https://cardbuddys.de",
+    "Pokeviert": "https://pokeviert.de",
+    "Smyths": "https://www.smythstoys.com/de/de-de",
+    "Müller": "https://www.mueller.de",
+    "Rossmann": "https://www.rossmann.de",
+    "dm": "https://www.dm.de",
+    "GameStop": "https://www.gamestop.de",
+    "Games Island": "https://games-island.eu",
+    "Trader Online": "https://www.trader-online.de",
+    "TCG-Corner": "https://www.tcg-corner.de",
+    "Poke-Corner": "https://www.poke-corner.de",
+    "Cardicuno": "https://cardicuno.de",
+    "Collect-It": "https://collect-it.de",
+    "Mythic Games": "https://mythicgames.de",
+    "Lucky Card Shop": "https://luckycardshop.de",
+    "Kofuku": "https://kofuku.de",
+
+    "Amazon": "https://www.amazon.de",
+    "eBay": "https://www.ebay.de",
+    "OTTO": "https://www.otto.de",
+    "Kaufland": "https://www.kaufland.de",
+    "MediaMarkt": "https://www.mediamarkt.de",
+    "Saturn": "https://www.saturn.de",
+    "Thalia": "https://www.thalia.de",
+    "Müller Online": "https://www.mueller.de",
+
+    "PokeNinJapan": "https://pokeninjapan.store",
+    "Plaza Japan": "https://www.plazajapan.com",
+    "Japan2UK": "https://www.japan2uk.com",
+    "Chaos Cards": "https://www.chaoscards.co.uk",
+    "Meccha Japan": "https://meccha-japan.com"
+}
 
 def get_product_trend(query):
     q = query.lower()

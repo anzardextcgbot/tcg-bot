@@ -2045,6 +2045,51 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
+    print("🔄 Shop-Restock-Check läuft...")
+
+    cursor.execute(
+        """
+        SELECT product_name, shop_name, shop_url
+        FROM global_shop_products
+        """
+    )
+
+    products = cursor.fetchall()
+
+    if not products:
+        return
+
+    cursor.execute(
+        """
+        SELECT DISTINCT user_id
+        FROM tracked_products
+        """
+    )
+
+    users = cursor.fetchall()
+
+    for product_name, shop_name, shop_url in products:
+        status = check_restock(shop_url)
+
+        if status is not True:
+            continue
+
+        for user in users:
+            user_id = user[0]
+
+            text = (
+                "🚨 RESTOCK ALARM!\n\n"
+                f"📦 {product_name}\n"
+                f"🏪 {shop_name}\n"
+                f"🛒 {shop_url}"
+            )
+
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text
+            )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2060,6 +2105,12 @@ def main():
         auto_restock_check,
         interval=300,
         first=20
+    )
+
+    job_queue.run_repeating(
+        auto_shop_restock_check,
+        interval=300,
+        first=30
     )
 
     app.add_handler(CommandHandler("start", start))
@@ -2098,6 +2149,8 @@ def main():
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
     app.add_handler(CommandHandler("listshopproducts", listshopproducts))
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
+
+
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

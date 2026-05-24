@@ -1822,6 +1822,16 @@ async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+async def restocktest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            "🚨 RESTOCK ALARM!\n\n"
+            "📦 Pokémon 151 ETB\n"
+            "🛒 Produkt möglicherweise wieder verfügbar!"
+        )
+    )
+
 async def checkproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 
@@ -1906,6 +1916,7 @@ def main():
     app.add_handler(CommandHandler("trackproduct", trackproduct))
     app.add_handler(CommandHandler("myproducts", myproducts))
     app.add_handler(CommandHandler("checkproducts", checkproducts))
+    app.add_handler(CommandHandler("restocktest", restocktest))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)
     )

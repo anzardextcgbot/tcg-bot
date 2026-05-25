@@ -2641,7 +2641,27 @@ def generate_price_chart(product_name, history):
 
     plt.figure(figsize=(6, 4))
 
-    plt.plot(history)
+    clean_history = []
+
+    for item in history:
+
+        number = (
+            str(item)
+            .replace("ca.", "")
+            .replace("€", "")
+            .replace(",", ".")
+            .strip()
+        )
+
+        if "-" in number:
+            number = number.split("-")[0].strip()
+
+        try:
+            clean_history.append(float(number))
+        except:
+            pass
+
+    plt.plot(clean_history, marker="o")
 
     plt.title(product_name)
     plt.xlabel("Preischecks")
@@ -2654,7 +2674,6 @@ def generate_price_chart(product_name, history):
     plt.close()
 
     return filename
-
 async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = " ".join(context.args)

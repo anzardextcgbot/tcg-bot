@@ -1617,14 +1617,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "trend_cards":
-        await query.edit_message_text(
-            "🃏 Karten-Trends folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-            ])
+   if data == "trend_cards":
+
+    text = "🃏 Karten-Trends\n\n"
+
+    if not CARD_SEARCH_COUNT:
+        text += "Noch keine Karten-Trends vorhanden."
+    else:
+        sorted_cards = sorted(
+            CARD_SEARCH_COUNT.items(),
+            key=lambda x: x[1],
+            reverse=True
         )
-        return
+
+        for name, count in sorted_cards[:10]:
+            text += f"🔥 {name} ({count}x)\n"
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+        ])
+    )
+
+    return
 
     if data == "menu_watchlist":
         keyboard = [

@@ -2617,6 +2617,33 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = " ".join(context.args)
+
+    if not query:
+        await update.message.reply_text(
+            "Benutze:\n/producthistory 151 etb"
+        )
+        return
+
+    query_lower = query.lower()
+
+    history = PRODUCT_HISTORY.get(query_lower)
+
+    if not history:
+        await update.message.reply_text(
+            "Keine Preishistorie gefunden."
+        )
+        return
+
+    text = f"📈 Preisverlauf für:\n{query}\n\n"
+
+    for entry in history[-10:]:
+        text += f"💰 {entry}\n"
+
+    await update.message.reply_text(text)
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2682,6 +2709,7 @@ def main():
     app.add_handler(CommandHandler("menu", menu))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^menu_"))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(menu_|product_|back_)"))
+    app.add_handler(CommandHandler("producthistory", producthistory))
 
     app.add_handler(
 

@@ -1587,74 +1587,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-   if data == "menu_trends":
-    keyboard = [
-        [
-            InlineKeyboardButton("📦 Produkt-Trends", callback_data="trend_products"),
-            InlineKeyboardButton("🃏 Karten-Trends", callback_data="trend_cards")
-        ],
-        [
-            InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
+    if data == "menu_trends":
+        keyboard = [
+            [
+                InlineKeyboardButton("📦 Produkt-Trends", callback_data="trend_products"),
+                InlineKeyboardButton("🃏 Karten-Trends", callback_data="trend_cards")
+            ],
+            [
+                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
+            ]
         ]
-    ]
 
-    await query.edit_message_text(
-        "📈 Trend-Menü",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    return
-if data == "trend_products":
-
-    text = "📦 Produkt-Trends\n\n"
-
-    if PRODUCT_TRENDS:
-        sorted_trends = sorted(
-            PRODUCT_TRENDS.items(),
-            key=lambda x: x[1],
-            reverse=True
+        await query.edit_message_text(
+            "📈 Trend-Menü",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return
 
-        for name, count in sorted_trends[:10]:
-            text += f"🔥 {name} ({count})\n"
-
-    else:
-        text += "Noch keine Trends vorhanden."
-
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-        ])
-    )
-
-    return
-
-
-if data == "trend_cards":
-
-    text = "🃏 Karten-Trends\n\n"
-
-    if CARD_SEARCH_COUNT:
-        sorted_cards = sorted(
-            CARD_SEARCH_COUNT.items(),
-            key=lambda x: x[1],
-            reverse=True
+    if data == "trend_products":
+        await query.edit_message_text(
+            "📦 Produkt-Trends folgen bald.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+            ])
         )
+        return
 
-        for name, count in sorted_cards[:10]:
-            text += f"🔥 {name} ({count})\n"
-
-    else:
-        text += "Noch keine Karten-Trends vorhanden."
-
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-        ])
-    )
-
-    return
+    if data == "trend_cards":
+        await query.edit_message_text(
+            "🃏 Karten-Trends folgen bald.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+            ])
+        )
+        return
 
     if data == "menu_watchlist":
         keyboard = [
@@ -1674,25 +1640,8 @@ if data == "trend_cards":
         return
 
     if data == "watch_cards":
-        cursor.execute(
-            """
-            SELECT card_name
-            FROM tracked_cards
-            """
-        )
-
-        cards = cursor.fetchall()
-
-        text = "🃏 Meine Karten\n\n"
-
-        if not cards:
-            text += "Keine Karten gespeichert."
-        else:
-            for card in cards:
-                text += f"• {card[0]}\n"
-
         await query.edit_message_text(
-            text,
+            "🃏 Karten-Watchlist",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
             ])
@@ -1700,25 +1649,8 @@ if data == "trend_cards":
         return
 
     if data == "watch_products":
-        cursor.execute(
-            """
-            SELECT product_query
-            FROM tracked_products
-            """
-        )
-
-        products = cursor.fetchall()
-
-        text = "📦 Meine Produkte\n\n"
-
-        if not products:
-            text += "Keine Produkte gespeichert."
-        else:
-            for product in products:
-                text += f"• {product[0]}\n"
-
         await query.edit_message_text(
-            text,
+            "📦 Produkt-Watchlist",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
             ])

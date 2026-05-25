@@ -1,6 +1,7 @@
 import sqlite3
 import requests
 import json
+import matplotlib.pyplot as plt
 
 from telegram import (
     Update,
@@ -2636,6 +2637,24 @@ def detect_product_price_change(query):
 
     return "➖ Preis stabil."
 
+def generate_price_chart(product_name, history):
+
+    plt.figure(figsize=(6, 4))
+
+    plt.plot(history)
+
+    plt.title(product_name)
+    plt.xlabel("Preischecks")
+    plt.ylabel("Preis €")
+
+    filename = f"{product_name}.png"
+
+    plt.savefig(filename)
+
+    plt.close()
+
+    return filename
+
 async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = " ".join(context.args)
@@ -2649,6 +2668,7 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query_lower = query.lower()
 
     history = PRODUCT_HISTORY.get(query_lower)
+    chart_file = generate_price_chart(query, history)
     price_change = detect_product_price_change(query_lower)
 
     if not history:
@@ -2663,7 +2683,11 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for entry in history[-10:]:
         text += f"💰 {entry}\n"
 
-    await update.message.reply_text(text)
+    with open(chart_file, "rb") as photo:
+    await update.message.reply_photo(
+        photo=photo,
+        caption=text
+    )
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

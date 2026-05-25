@@ -1610,56 +1610,55 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "trend_products":
 
-    text = "📦 Produkt-Trends\n\n"
+        text = "📦 Produkt-Trends\n\n"
 
-    if not PRODUCT_TRENDS:
-        text += "Noch keine Produkt-Trends vorhanden."
+        if not PRODUCT_TRENDS:
+            text += "Noch keine Produkt-Trends vorhanden."
 
-    else:
-        sorted_products = sorted(
-            PRODUCT_TRENDS.items(),
-            key=lambda x: x[1],
-            reverse=True
+        else:
+            sorted_products = sorted(
+                PRODUCT_TRENDS.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+
+            for name, count in sorted_products[:10]:
+                text += f"🔥 {name} ({count}x)\n"
+
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+            ])
         )
 
-        for name, count in sorted_products[:10]:
-            text += f"🔥 {name} ({count}x)\n"
+        return
 
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-        ])
-    )
+    if data == "trend_cards":
 
-    return
+        text = "🃏 Karten-Trends\n\n"
 
+        if not CARD_SEARCH_COUNT:
+            text += "Noch keine Karten-Trends vorhanden."
 
-if data == "trend_cards":
+        else:
+            sorted_cards = sorted(
+                CARD_SEARCH_COUNT.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
 
-    text = "🃏 Karten-Trends\n\n"
+            for name, count in sorted_cards[:10]:
+                text += f"🔥 {name} ({count}x)\n"
 
-    if not CARD_SEARCH_COUNT:
-        text += "Noch keine Karten-Trends vorhanden."
-
-    else:
-        sorted_cards = sorted(
-            CARD_SEARCH_COUNT.items(),
-            key=lambda x: x[1],
-            reverse=True
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+            ])
         )
 
-        for name, count in sorted_cards[:10]:
-            text += f"🔥 {name} ({count}x)\n"
-
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-        ])
-    )
-
-    return
+        return
 
     if data == "menu_watchlist":
         keyboard = [
@@ -1733,7 +1732,6 @@ if data == "trend_cards":
             ])
         )
         return
-
 async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

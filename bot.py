@@ -1634,12 +1634,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return
 
-   if data == "trend_cards":
+
+if data == "trend_cards":
 
     text = "🃏 Karten-Trends\n\n"
 
     if not CARD_SEARCH_COUNT:
         text += "Noch keine Karten-Trends vorhanden."
+
     else:
         sorted_cards = sorted(
             CARD_SEARCH_COUNT.items(),

@@ -229,7 +229,7 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     search_words = query.lower().split()
 
     query_lower = query.lower()
-
+    CARD_SEARCH_COUNT[query_lower] = CARD_SEARCH_COUNT.get(query_lower, 0) + 1
     matched_set = None
     best_match = ""
 
@@ -2039,6 +2039,8 @@ PRODUCT_PRICES = {
 
 LAST_PRODUCT_PRICES = {}
 PRODUCT_HISTORY = {}
+PRODUCT_TRENDS = {}
+CARD_SEARCH_COUNT = {}
 LAST_RESTOCK_ALERTS = {}
 SHOP_SEARCH_PATTERNS = {
     "Gate to the Games":

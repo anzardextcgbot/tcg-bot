@@ -2392,6 +2392,7 @@ def main():
     app.add_handler(CommandHandler("findproductpages", findproductpages))
     app.add_handler(CommandHandler("savefoundproduct", savefoundproduct))
     app.add_handler(CommandHandler("menu", menu))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern="^menu_"))
 
     app.add_handler(
 

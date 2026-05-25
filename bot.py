@@ -1408,20 +1408,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data
+    user_id = str(query.from_user.id)
 
     if data == "back_main":
         keyboard = [
-            [
-                InlineKeyboardButton("🔍 Karten", callback_data="menu_cards"),
-                InlineKeyboardButton("📦 Produkte", callback_data="menu_products")
-            ],
-            [
-                InlineKeyboardButton("🔔 Restocks", callback_data="menu_restocks"),
-                InlineKeyboardButton("📈 Trends", callback_data="menu_trends")
-            ],
-            [
-                InlineKeyboardButton("⭐ Watchlist", callback_data="menu_watchlist")
-            ]
+            [InlineKeyboardButton("🔍 Karten", callback_data="menu_cards"),
+             InlineKeyboardButton("📦 Produkte", callback_data="menu_products")],
+            [InlineKeyboardButton("🔔 Restocks", callback_data="menu_restocks"),
+             InlineKeyboardButton("📈 Trends", callback_data="menu_trends")],
+            [InlineKeyboardButton("⭐ Watchlist", callback_data="menu_watchlist")]
         ]
 
         await query.edit_message_text(
@@ -1430,207 +1425,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "menu_cards":
-        await query.edit_message_text(
-            "🔍 Sende einfach einen Kartennamen.\n\n"
-            "Beispiel:\n"
-            "Giratina V Lost Origin",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]
-            ])
-        )
-        return
-
-    if data == "menu_products":
-        keyboard = [
-            [
-                InlineKeyboardButton("🔎 Produkt suchen", callback_data="product_search_help"),
-                InlineKeyboardButton("🔥 Trending", callback_data="product_trending")
-            ],
-            [
-                InlineKeyboardButton("🇯🇵 JP Produkte", callback_data="product_jp"),
-                InlineKeyboardButton("🆕 Neue Sets", callback_data="product_new")
-            ],
-            [
-                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
-            ]
-        ]
-
-        await query.edit_message_text(
-            "📦 Produktmenü",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
-    if data == "product_search_help":
-        await query.edit_message_text(
-            "🔎 Sende einfach ein Produkt.\n\n"
-            "Beispiele:\n"
-            "151 ETB\n"
-            "Lost Origin Booster Box\n"
-            "JP 151 Display",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_products")]
-            ])
-        )
-        return
-
-    if data == "product_trending":
-        await query.edit_message_text(
-            "🔥 Trending Produkte folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_products")]
-            ])
-        )
-        return
-
-    if data == "product_jp":
-        await query.edit_message_text(
-            "🇯🇵 JP Produkte\n\n"
-            "Beispiele:\n"
-            "151 JP\n"
-            "VSTAR Universe\n"
-            "Battle Partners",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_products")]
-            ])
-        )
-        return
-
-    if data == "product_new":
-        await query.edit_message_text(
-            "🆕 Neue Pokémon Sets folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_products")]
-            ])
-        )
-        return
-
-    if data == "menu_restocks":
-        keyboard = [
-            [
-                InlineKeyboardButton("🔔 Meine Produkte", callback_data="restock_myproducts"),
-                InlineKeyboardButton("🔍 Shop-Check", callback_data="restock_check")
-            ],
-            [
-                InlineKeyboardButton("🌍 Shop-Produkte", callback_data="restock_shopproducts")
-            ],
-            [
-                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
-            ]
-        ]
-
-        await query.edit_message_text(
-            "🔔 Restock-Menü",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
-    if data == "restock_myproducts":
-        cursor.execute(
-            """
-            SELECT product_query
-            FROM tracked_products
-            """
-        )
-
-        products = cursor.fetchall()
-
-        text = "🔔 Beobachtete Produkte\n\n"
-
-        if not products:
-            text += "Noch keine Produkte."
-        else:
-            for product in products:
-                text += f"• {product[0]}\n"
-
-        await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]
-            ])
-        )
-        return
-
-    if data == "restock_check":
-        await query.edit_message_text(
-            "🔍 Shop-Checks laufen automatisch alle 5 Minuten.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]
-            ])
-        )
-        return
-
-    if data == "restock_shopproducts":
-        cursor.execute(
-            """
-            SELECT product_name, shop_name
-            FROM global_shop_products
-            """
-        )
-
-        products = cursor.fetchall()
-
-        text = "🌍 Globale Shop-Produkte\n\n"
-
-        if not products:
-            text += "Keine Produkte gespeichert."
-        else:
-            for product_name, shop_name in products:
-                text += f"📦 {product_name} — {shop_name}\n"
-
-        await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]
-            ])
-        )
-        return
-
-    if data == "menu_trends":
-        keyboard = [
-            [
-                InlineKeyboardButton("📦 Produkt-Trends", callback_data="trend_products"),
-                InlineKeyboardButton("🃏 Karten-Trends", callback_data="trend_cards")
-            ],
-            [
-                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
-            ]
-        ]
-
-        await query.edit_message_text(
-            "📈 Trend-Menü",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
-    if data == "trend_products":
-        await query.edit_message_text(
-            "📦 Produkt-Trends folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-            ])
-        )
-        return
-
-    if data == "trend_cards":
-        await query.edit_message_text(
-            "🃏 Karten-Trends folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-            ])
-        )
-        return
-
     if data == "menu_watchlist":
         keyboard = [
-            [
-                InlineKeyboardButton("🃏 Meine Karten", callback_data="watch_cards"),
-                InlineKeyboardButton("📦 Meine Produkte", callback_data="watch_products")
-            ],
-            [
-                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
-            ]
+            [InlineKeyboardButton("🃏 Meine Karten", callback_data="watch_cards"),
+             InlineKeyboardButton("📦 Meine Produkte", callback_data="watch_products")],
+            [InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]
         ]
 
         await query.edit_message_text(
@@ -1640,8 +1439,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "watch_cards":
+        cursor.execute(
+            """
+            SELECT card_name
+            FROM tracked_cards
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        cards = cursor.fetchall()
+
+        text = "🃏 Meine Karten\n\n"
+
+        if not cards:
+            text += "Keine Karten gespeichert."
+        else:
+            for card in cards:
+                text += f"• {card[0]}\n"
+
         await query.edit_message_text(
-            "🃏 Karten-Watchlist",
+            text,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
             ])
@@ -1649,8 +1467,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "watch_products":
+        cursor.execute(
+            """
+            SELECT product_query
+            FROM tracked_products
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        products = cursor.fetchall()
+
+        text = "📦 Meine Produkte\n\n"
+
+        if not products:
+            text += "Keine Produkte gespeichert."
+        else:
+            for product in products:
+                text += f"• {product[0]}\n"
+
         await query.edit_message_text(
-            "📦 Produkt-Watchlist",
+            text,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
             ])

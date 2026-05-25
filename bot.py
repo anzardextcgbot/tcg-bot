@@ -2200,6 +2200,7 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
                 "🚨 RESTOCK ALARM!\n\n"
                 f"📦 {product_name}\n"
                 f"🏪 {shop_name}\n"
+                f"💰 Preis: {price}\n"
                 f"🛒 {shop_url}"
             )
 

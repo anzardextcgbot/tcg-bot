@@ -2684,10 +2684,11 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"💰 {entry}\n"
 
     with open(chart_file, "rb") as photo:
-    await update.message.reply_photo(
-        photo=photo,
-        caption=text
-    )
+
+        await update.message.reply_photo(
+            photo=photo,
+            caption=text
+        )
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

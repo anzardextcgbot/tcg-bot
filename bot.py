@@ -1409,33 +1409,95 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
 
-    back_button = [[InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]]
+    if data == "back_main":
+        keyboard = [
+            [InlineKeyboardButton("🔍 Karten", callback_data="menu_cards"),
+             InlineKeyboardButton("📦 Produkte", callback_data="menu_products")],
+            [InlineKeyboardButton("🔔 Restocks", callback_data="menu_restocks"),
+             InlineKeyboardButton("📈 Trends", callback_data="menu_trends")],
+            [InlineKeyboardButton("⭐ Watchlist", callback_data="menu_watchlist")]
+        ]
+
+        await query.edit_message_text(
+            "🔥 Hauptmenü",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
 
     if data == "menu_cards":
         await query.edit_message_text(
             "🔍 Sende einfach einen Kartennamen.\n\nBeispiel:\nGiratina V Lost Origin",
-            reply_markup=InlineKeyboardMarkup(back_button)
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]])
         )
         return
 
     if data == "menu_products":
         keyboard = [
-            [
-                InlineKeyboardButton("🔎 Produkt suchen", callback_data="product_search_help"),
-                InlineKeyboardButton("🔥 Trending", callback_data="product_trending")
-            ],
-            [
-                InlineKeyboardButton("🇯🇵 JP Produkte", callback_data="product_jp"),
-                InlineKeyboardButton("🆕 Neue Sets", callback_data="product_new")
-            ],
-            [
-                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
-            ]
+            [InlineKeyboardButton("🔎 Produkt suchen", callback_data="product_search_help"),
+             InlineKeyboardButton("🔥 Trending", callback_data="product_trending")],
+            [InlineKeyboardButton("🇯🇵 JP Produkte", callback_data="product_jp"),
+             InlineKeyboardButton("🆕 Neue Sets", callback_data="product_new")],
+            [InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]
         ]
 
         await query.edit_message_text(
             "📦 Produktmenü",
             reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    if data == "menu_restocks":
+        keyboard = [
+            [InlineKeyboardButton("🔔 Meine Produkte", callback_data="restock_myproducts"),
+             InlineKeyboardButton("🔍 Shop-Check", callback_data="restock_check")],
+            [InlineKeyboardButton("🌍 Shop-Produkte", callback_data="restock_shopproducts")],
+            [InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]
+        ]
+
+        await query.edit_message_text(
+            "🔔 Restock-Menü",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    if data == "restock_myproducts":
+        cursor.execute("SELECT product_query FROM tracked_products")
+        products = cursor.fetchall()
+
+        text = "🔔 Beobachtete Produkte\n\n"
+        if not products:
+            text += "Noch keine Produkte."
+        else:
+            for product in products:
+                text += f"• {product[0]}\n"
+
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]])
+        )
+        return
+
+    if data == "restock_check":
+        await query.edit_message_text(
+            "🔍 Shop-Checks laufen automatisch alle 5 Minuten.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]])
+        )
+        return
+
+    if data == "restock_shopproducts":
+        cursor.execute("SELECT product_name, shop_name FROM global_shop_products")
+        products = cursor.fetchall()
+
+        text = "🌍 Globale Shop-Produkte\n\n"
+        if not products:
+            text += "Keine Produkte gespeichert."
+        else:
+            for product_name, shop_name in products:
+                text += f"📦 {product_name} — {shop_name}\n"
+
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="menu_restocks")]])
         )
         return
 
@@ -1467,45 +1529,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "menu_restocks":
-        await query.edit_message_text(
-            "🔔 Restock-System aktiv.\n\nNutze aktuell:\n/trackproduct 151 etb",
-            reply_markup=InlineKeyboardMarkup(back_button)
-        )
-        return
-
     if data == "menu_trends":
         await query.edit_message_text(
             "📈 Trend-System aktiv.\n\nProduktpreise und Entwicklungen folgen.",
-            reply_markup=InlineKeyboardMarkup(back_button)
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]])
         )
         return
 
     if data == "menu_watchlist":
         await query.edit_message_text(
             "⭐ Watchlist-System.\n\nNutze aktuell:\n/myproducts",
-            reply_markup=InlineKeyboardMarkup(back_button)
-        )
-        return
-
-    if data == "back_main":
-        keyboard = [
-            [
-                InlineKeyboardButton("🔍 Karten", callback_data="menu_cards"),
-                InlineKeyboardButton("📦 Produkte", callback_data="menu_products")
-            ],
-            [
-                InlineKeyboardButton("🔔 Restocks", callback_data="menu_restocks"),
-                InlineKeyboardButton("📈 Trends", callback_data="menu_trends")
-            ],
-            [
-                InlineKeyboardButton("⭐ Watchlist", callback_data="menu_watchlist")
-            ]
-        ]
-
-        await query.edit_message_text(
-            "🔥 Hauptmenü",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]])
         )
         return
 
@@ -2454,6 +2488,7 @@ def main():
     app.add_handler(CommandHandler("savefoundproduct", savefoundproduct))
     app.add_handler(CommandHandler("menu", menu))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^menu_"))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(menu_|product_|back_)"))
 
     app.add_handler(
 

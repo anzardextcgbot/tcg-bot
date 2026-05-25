@@ -1587,15 +1587,74 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "menu_trends":
-        await query.edit_message_text(
-            "📈 Trend-System aktiv.\n\n"
-            "Produktpreise und Entwicklungen folgen.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]
-            ])
+   if data == "menu_trends":
+    keyboard = [
+        [
+            InlineKeyboardButton("📦 Produkt-Trends", callback_data="trend_products"),
+            InlineKeyboardButton("🃏 Karten-Trends", callback_data="trend_cards")
+        ],
+        [
+            InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
+        ]
+    ]
+
+    await query.edit_message_text(
+        "📈 Trend-Menü",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return
+if data == "trend_products":
+
+    text = "📦 Produkt-Trends\n\n"
+
+    if PRODUCT_TRENDS:
+        sorted_trends = sorted(
+            PRODUCT_TRENDS.items(),
+            key=lambda x: x[1],
+            reverse=True
         )
-        return
+
+        for name, count in sorted_trends[:10]:
+            text += f"🔥 {name} ({count})\n"
+
+    else:
+        text += "Noch keine Trends vorhanden."
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+        ])
+    )
+
+    return
+
+
+if data == "trend_cards":
+
+    text = "🃏 Karten-Trends\n\n"
+
+    if CARD_SEARCH_COUNT:
+        sorted_cards = sorted(
+            CARD_SEARCH_COUNT.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        for name, count in sorted_cards[:10]:
+            text += f"🔥 {name} ({count})\n"
+
+    else:
+        text += "Noch keine Karten-Trends vorhanden."
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+        ])
+    )
+
+    return
 
     if data == "menu_watchlist":
         keyboard = [

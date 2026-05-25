@@ -2258,6 +2258,14 @@ async def findproductpages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def savefoundproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Benutze:\n"
+        "/addshopproduct PRODUKT | SHOP | URL\n\n"
+        "Beispiel:\n"
+        "/addshopproduct 151 ETB | Smyths | https://..."
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2319,6 +2327,7 @@ def main():
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
     app.add_handler(CommandHandler("searchshops", searchshops))
     app.add_handler(CommandHandler("findproductpages", findproductpages))
+    app.add_handler(CommandHandler("savefoundproduct", savefoundproduct))
 
     app.add_handler(
 

@@ -1402,11 +1402,10 @@ async def untrackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🗑 URL entfernt."
     )
-async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = str(query.from_user.id)
     data = query.data
 
     if data == "menu_cards":
@@ -1414,106 +1413,39 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
             "🔍 Sende einfach einen Kartennamen.\n\n"
             "Beispiel:\n"
             "Giratina V Lost Origin"
-       )
-       return
+        )
+        return
 
     if data == "menu_products":
         await query.edit_message_text(
             "📦 Sende einfach ein Produkt.\n\n"
             "Beispiel:\n"
             "151 ETB"
-       )
-       return
+        )
+        return
 
     if data == "menu_restocks":
         await query.edit_message_text(
             "🔔 Restock-System aktiv.\n\n"
             "Nutze aktuell:\n"
             "/trackproduct 151 etb"
-       )
-       return
+        )
+        return
 
     if data == "menu_trends":
         await query.edit_message_text(
             "📈 Trend-System aktiv.\n\n"
             "Produktpreise und Entwicklungen folgen."
-       )
-       return
+        )
+        return
 
     if data == "menu_watchlist":
         await query.edit_message_text(
             "⭐ Watchlist-System.\n\n"
             "Nutze aktuell:\n"
             "/myproducts"
-       )
-       return
-
-    if data.startswith("track_"):
-        card_name = data.replace("track_", "")
-
-        cursor.execute(
-            "SELECT * FROM tracked_cards WHERE user_id = ? AND card_name = ?",
-            (user_id, card_name)
         )
-
-        existing = cursor.fetchone()
-
-        if existing:
-            cursor.execute(
-                """
-                DELETE FROM tracked_cards
-                WHERE user_id = ? AND card_name = ?
-                """,
-                (user_id, card_name)
-            )
-
-            conn.commit()
-
-            await query.message.reply_text(
-                f"❌ Tracking entfernt: {card_name}"
-            )
-
-            return
-
-        cursor.execute(
-            "INSERT INTO tracked_cards (user_id, card_name) VALUES (?, ?)",
-            (user_id, card_name)
-        )
-
-        conn.commit()
-
-        await query.message.reply_text(
-            f"✅ Karte wird beobachtet: {card_name}"
-        )
-
-    elif data.startswith("history_"):
-        card_name = data.replace("history_", "")
-
-        cursor.execute(
-            """
-            SELECT price, checked_at
-            FROM price_history
-            WHERE card_name = ?
-            ORDER BY checked_at DESC
-            LIMIT 5
-            """,
-            (card_name,)
-        )
-
-        results = cursor.fetchall()
-
-        if not results:
-            await query.message.reply_text(
-                "Noch keine Preise gespeichert."
-            )
-            return
-
-        text = f"📈 Preisverlauf für {card_name}\n\n"
-
-        for price, checked_at in results:
-            text += f"💰 {price} € — {checked_at}\n"
-
-        await query.message.reply_text(text)
+        returneply_text(text)
 
 def load_all_sets():
     url = "https://api.pokemontcg.io/v2/sets"

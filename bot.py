@@ -1609,13 +1609,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "trend_products":
-        await query.edit_message_text(
-            "📦 Produkt-Trends folgen bald.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
-            ])
+
+    text = "📦 Produkt-Trends\n\n"
+
+    if not PRODUCT_TRENDS:
+        text += "Noch keine Produkt-Trends vorhanden."
+    else:
+        sorted_products = sorted(
+            PRODUCT_TRENDS.items(),
+            key=lambda x: x[1],
+            reverse=True
         )
-        return
+
+        for name, count in sorted_products[:10]:
+            text += f"🔥 {name} ({count}x)\n"
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Zurück", callback_data="menu_trends")]
+        ])
+    )
+
+    return
 
    if data == "trend_cards":
 

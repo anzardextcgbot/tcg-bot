@@ -1537,11 +1537,80 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_watchlist":
-        await query.edit_message_text(
-            "⭐ Watchlist-System.\n\nNutze aktuell:\n/myproducts",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Zurück", callback_data="back_main")]])
-        )
-        return
+        keyboard = [
+            [
+                InlineKeyboardButton("🃏 Meine Karten", callback_data="watch_cards"),
+                InlineKeyboardButton("📦 Meine Produkte", callback_data="watch_products")
+            ],
+            [
+                InlineKeyboardButton("🔙 Zurück", callback_data="back_main")
+            ]
+       ]
+
+       await query.edit_message_text(
+           "⭐ Watchlist",
+           reply_markup=InlineKeyboardMarkup(keyboard)
+       )
+       return
+
+   if data == "watch_cards":
+
+       cursor.execute(
+           """
+           SELECT card_name
+           FROM tracked_cards
+           """
+       )
+
+       cards = cursor.fetchall()
+
+       text = "🃏 Meine Karten\n\n"
+
+       if not cards:
+           text += "Keine Karten gespeichert."
+
+       else:
+           for card in cards:
+               text += f"• {card[0]}\n"
+
+       await query.edit_message_text(
+           text,
+           reply_markup=InlineKeyboardMarkup([
+               [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
+           ])
+       )
+
+       return
+
+
+   if data == "watch_products":
+ 
+       cursor.execute(
+           """
+           SELECT product_query
+           FROM tracked_products
+           """
+       )
+
+       products = cursor.fetchall()
+
+       text = "📦 Meine Produkte\n\n"
+
+       if not products:
+           text += "Keine Produkte gespeichert."
+
+       else:
+           for product in products:
+               text += f"• {product[0]}\n"
+
+       await query.edit_message_text(
+           text,
+           reply_markup=InlineKeyboardMarkup([
+               [InlineKeyboardButton("🔙 Zurück", callback_data="menu_watchlist")]
+           ])
+       )
+
+       return
 
 async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

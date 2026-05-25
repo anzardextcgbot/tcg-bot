@@ -2176,6 +2176,8 @@ def get_product_history(query):
 
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
+    query_lower = query.lower()
+    PRODUCT_TRENDS[query_lower] = PRODUCT_TRENDS.get(query_lower, 0) + 1
     product_type = "Produkt"
 
     for keyword, display_name in PRODUCT_TYPES.items():

@@ -1614,6 +1614,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not PRODUCT_TRENDS:
         text += "Noch keine Produkt-Trends vorhanden."
+
     else:
         sorted_products = sorted(
             PRODUCT_TRENDS.items(),

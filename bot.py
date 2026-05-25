@@ -2617,6 +2617,25 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+def detect_product_price_change(query):
+    q = query.lower()
+
+    history = PRODUCT_HISTORY.get(q)
+
+    if not history or len(history) < 2:
+        return "Noch nicht genug Daten."
+
+    old_price = history[-2]
+    new_price = history[-1]
+
+    if new_price < old_price:
+        return f"📉 Preis gefallen: {old_price} → {new_price}"
+
+    if new_price > old_price:
+        return f"📈 Preis gestiegen: {old_price} → {new_price}"
+
+    return "➖ Preis stabil."
+
 async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = " ".join(context.args)
@@ -2630,6 +2649,7 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query_lower = query.lower()
 
     history = PRODUCT_HISTORY.get(query_lower)
+    price_change = detect_product_price_change(query_lower)
 
     if not history:
         await update.message.reply_text(
@@ -2638,6 +2658,7 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = f"📈 Preisverlauf für:\n{query}\n\n"
+    text += f"{price_change}\n\n"
 
     for entry in history[-10:]:
         text += f"💰 {entry}\n"

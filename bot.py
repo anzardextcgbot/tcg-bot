@@ -2266,6 +2266,29 @@ async def savefoundproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/addshopproduct 151 ETB | Smyths | https://..."
     )
 
+async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🔍 Karten", callback_data="menu_cards"),
+            InlineKeyboardButton("📦 Produkte", callback_data="menu_products")
+        ],
+        [
+            InlineKeyboardButton("🔔 Restocks", callback_data="menu_restocks"),
+            InlineKeyboardButton("📈 Trends", callback_data="menu_trends")
+        ],
+        [
+            InlineKeyboardButton("⭐ Watchlist", callback_data="menu_watchlist")
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🔥 Hauptmenü",
+        reply_markup=reply_markup
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2328,6 +2351,7 @@ def main():
     app.add_handler(CommandHandler("searchshops", searchshops))
     app.add_handler(CommandHandler("findproductpages", findproductpages))
     app.add_handler(CommandHandler("savefoundproduct", savefoundproduct))
+    app.add_handler(CommandHandler("menu", menu))
 
     app.add_handler(
 

@@ -1409,6 +1409,45 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = str(query.from_user.id)
     data = query.data
 
+    if data == "menu_cards":
+        await query.edit_message_text(
+            "🔍 Sende einfach einen Kartennamen.\n\n"
+            "Beispiel:\n"
+            "Giratina V Lost Origin"
+       )
+       return
+
+    if data == "menu_products":
+        await query.edit_message_text(
+            "📦 Sende einfach ein Produkt.\n\n"
+            "Beispiel:\n"
+            "151 ETB"
+       )
+       return
+
+    if data == "menu_restocks":
+        await query.edit_message_text(
+            "🔔 Restock-System aktiv.\n\n"
+            "Nutze aktuell:\n"
+            "/trackproduct 151 etb"
+       )
+       return
+
+    if data == "menu_trends":
+        await query.edit_message_text(
+            "📈 Trend-System aktiv.\n\n"
+            "Produktpreise und Entwicklungen folgen."
+       )
+       return
+
+    if data == "menu_watchlist":
+        await query.edit_message_text(
+            "⭐ Watchlist-System.\n\n"
+            "Nutze aktuell:\n"
+            "/myproducts"
+       )
+       return
+
     if data.startswith("track_"):
         card_name = data.replace("track_", "")
 

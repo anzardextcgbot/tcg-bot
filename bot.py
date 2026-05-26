@@ -2089,6 +2089,7 @@ PRODUCT_TRENDS = {}
 CARD_SEARCH_COUNT = {}
 LAST_RESTOCK_ALERTS = {}
 SHOP_SEARCH_PATTERNS = {
+
     "Gate to the Games":
         "https://www.gate-to-the-games.de/search?sSearch={query}",
 
@@ -2117,8 +2118,8 @@ SHOP_SEARCH_PATTERNS = {
         "https://www.gamestop.de/SearchResult/QuickSearch?q={query}",
 
     "Chaos Cards":
-        "https://www.chaoscards.co.uk/search/{query}"
-    
+        "https://www.chaoscards.co.uk/search/{query}",
+
     "OTTO":
         "https://www.otto.de/suche/{query}/",
 
@@ -2150,9 +2151,9 @@ SHOP_SEARCH_PATTERNS = {
         "https://meccha-japan.com/en/search?controller=search&s={query}",
 
     "Japan2UK":
-        "https://www.japan2uk.com/search?q={query}",
-}
+        "https://www.japan2uk.com/search?q={query}"
 
+}
 SHOPS = {
     "Gate to the Games": "https://www.gate-to-the-games.de",
     "Cardbuddys": "https://cardbuddys.de",

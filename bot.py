@@ -2761,6 +2761,44 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=text
         )
 
+async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = " ".join(context.args)
+
+    if not query:
+        await update.message.reply_text(
+            "Benutze:\n/autoproduct 151 etb"
+        )
+        return
+
+    search_query = normalize_product_query(query)
+    encoded_query = search_query.replace(" ", "+")
+
+    text = (
+        "🤖 Automatische Produktsuche gestartet\n\n"
+        f"📦 Produkt: {search_query}\n\n"
+        "Ich suche passende Shopseiten und bereite Restock-Überwachung vor."
+    )
+
+    await update.message.reply_text(text)
+
+    for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+        search_url = pattern.format(query=encoded_query)
+
+        cursor.execute(
+            """
+            INSERT INTO global_shop_products
+            (product_name, shop_name, shop_url)
+            VALUES (?, ?, ?)
+            """,
+            (search_query, shop_name, search_url)
+        )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -2827,7 +2865,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^menu_"))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(menu_|product_|back_)"))
     app.add_handler(CommandHandler("producthistory", producthistory))
-
+    app.add_handler(CommandHandler("autoproduct", autoproduct))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

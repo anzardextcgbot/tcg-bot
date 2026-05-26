@@ -2772,8 +2772,33 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=text
         )
 
+def find_gate_product_link(search_url, query):
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text
+
+        links = re.findall(r'href=["\'](.*?)["\']', html)
+
+        for link in links:
+            link_lower = link.lower()
+
+            if "pokemon" in link_lower and any(word in link_lower for word in query.lower().split()):
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
 def find_product_link(search_url, query):
     try:
+        if "gate-to-the-games.de" in search_url:
+        return find_gate_product_link(search_url, query)
         response = requests.get(
             search_url,
             timeout=10,

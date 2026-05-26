@@ -2796,9 +2796,12 @@ def find_gate_product_link(search_url, query):
         return search_url
 
 def find_product_link(search_url, query):
+
     try:
+
         if "gate-to-the-games.de" in search_url:
-        return find_gate_product_link(search_url, query)
+            return find_gate_product_link(search_url, query)
+
         response = requests.get(
             search_url,
             timeout=10,

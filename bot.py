@@ -2526,12 +2526,12 @@ async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
                 continue
 
             text = (
-                "🚨 RESTOCK ALARM!\n\n"
-                f"📦 {product_name}\n"
-                f"🏪 {shop_name}\n"
-                f"💰 Preis: {price}\n"
-                f"🛒 {shop_url}"
-            )
+   	 	"🚨 RESTOCK GEFUNDEN 🚨\n\n"
+    		f"📦 Produkt: {product_name}\n"
+   		f"🏪 Shop: {shop_name}\n"
+    		f"💰 Preis: {price}\n\n"
+    		f"🛒 Direktlink:\n{shop_url}"
+	    )
 
             await context.bot.send_message(
                 chat_id=user_id,

@@ -2836,13 +2836,21 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     search_query = normalize_product_query(query)
     encoded_query = search_query.replace(" ", "+")
 
-    text = (
+    cursor.execute(
+        """
+        DELETE FROM global_shop_products
+        WHERE product_name = ?
+        """,
+        (search_query,)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
         "🤖 Automatische Produktsuche gestartet\n\n"
         f"📦 Produkt: {search_query}\n\n"
         "Ich suche passende Shopseiten und bereite Restock-Überwachung vor."
     )
-
-    await update.message.reply_text(text)
 
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
         search_url = pattern.format(query=encoded_query)
@@ -2862,6 +2870,7 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
     )
+
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

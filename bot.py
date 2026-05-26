@@ -2787,7 +2787,7 @@ def find_gate_product_link(search_url, query):
         for link in links:
             link_lower = link.lower()
 
-            if "pokemon" in link_lower and any(word in link_lower for word in query.lower().split()):
+            if all(word in link_lower for word in query.lower().split()):
                 return urljoin(search_url, link)
 
         return search_url

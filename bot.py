@@ -2118,7 +2118,41 @@ SHOP_SEARCH_PATTERNS = {
 
     "Chaos Cards":
         "https://www.chaoscards.co.uk/search/{query}"
+    
+     "OTTO":
+         "https://www.otto.de/suche/{query}/",
+
+     "Kaufland":
+         "https://www.kaufland.de/s/?search_value={query}",
+
+     "MediaMarkt":
+         "https://www.mediamarkt.de/de/search.html?query={query}",
+
+     "Saturn":
+         "https://www.saturn.de/de/search.html?query={query}",
+
+     "Thalia":
+         "https://www.thalia.de/suche?sq={query}",
+
+     "Rossmann":
+         "https://www.rossmann.de/de/search?text={query}",
+
+     "dm":
+         "https://www.dm.de/search?query={query}",
+
+     "StockX":
+         "https://stockx.com/search?s={query}",
+
+     "Plaza Japan":
+         "https://www.plazajapan.com/search-results/?q={query}",
+
+     "Meccha Japan":
+         "https://meccha-japan.com/en/search?controller=search&s={query}",
+
+     "Japan2UK":
+         "https://www.japan2uk.com/search?q={query}",
 }
+
 SHOPS = {
     "Gate to the Games": "https://www.gate-to-the-games.de",
     "Cardbuddys": "https://cardbuddys.de",

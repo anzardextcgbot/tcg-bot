@@ -124,6 +124,16 @@ CREATE TABLE IF NOT EXISTS global_shop_products (
 
 conn.commit()
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sent_restock_alerts (
+    product_name TEXT,
+    shop_name TEXT,
+    status TEXT
+)
+""")
+
+conn.commit()
+
 def search_pokemon_card(card_name, set_name=None):
     url = "https://api.pokemontcg.io/v2/cards"
 

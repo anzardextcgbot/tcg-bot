@@ -2487,66 +2487,109 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
-async def auto_shop_restock_check(context: ContextTypes.DEFAULT_TYPE):
-    print("🔄 Shop-Restock-Check läuft...")
+def product_matches(user_query, product_name):
+    user_words = user_query.lower().split()
+    product_text = product_name.lower()
 
-    cursor.execute(
-        """
-        SELECT product_name, shop_name, shop_url
-        FROM global_shop_products
-        """
-    )
+    for word in user_words:
+        if word not in product_text:
+            return False
 
-    products = cursor.fetchall()
+    return True
 
-    if not products:
-        return
+async def auto_shop_restock_check(app):
 
-    for product_name, shop_name, shop_url in products:
+    while True:
 
-        status = check_restock(shop_url)
-        
+        try:
 
-        alert_key = f"{product_name}_{shop_name}"
+            for product_name, shop_name, shop_url in GLOBAL_SHOP_PRODUCTS:
 
-        if status is not True:
+                status = check_restock(shop_url)
 
-            if LAST_RESTOCK_ALERTS.get(alert_key) == "sent":
-                LAST_RESTOCK_ALERTS.pop(alert_key)
+                alert_key = f"{product_name}_{shop_name}"
 
-            continue
+                if status is not True:
 
-        if LAST_RESTOCK_ALERTS.get(alert_key) == "sent":
-            continue
+                    cursor.execute(
+                        """
+                        DELETE FROM sent_restock_alerts
+                        WHERE product_name = ? AND shop_name = ?
+                        """,
+                        (product_name, shop_name)
+                    )
 
-        LAST_RESTOCK_ALERTS[alert_key] = "sent"
+                    conn.commit()
 
-        cursor.execute(
-            """
-            SELECT user_id, product_query
-            FROM tracked_products
-            """
-        )
+                    continue
 
-        tracked = cursor.fetchall()
+                cursor.execute(
+                    """
+                    SELECT status
+                    FROM sent_restock_alerts
+                    WHERE product_name = ? AND shop_name = ?
+                    """,
+                    (product_name, shop_name)
+                )
 
-        for user_id, product_query in tracked:
+                existing_alert = cursor.fetchone()
 
-            if product_query.lower() not in product_name.lower():
-                continue
+                if existing_alert and existing_alert[0] == "sent":
+                    continue
 
-            text = (
-   	 	"🚨 RESTOCK GEFUNDEN 🚨\n\n"
-    		f"📦 Produkt: {product_name}\n"
-   		f"🏪 Shop: {shop_name}\n"
-    		f"💰 Preis: {price}\n\n"
-    		f"🛒 Direktlink:\n{shop_url}"
-	    )
+                cursor.execute(
+                    """
+                    INSERT INTO sent_restock_alerts (
+                        product_name,
+                        shop_name,
+                        status
+                    )
+                    VALUES (?, ?, ?)
+                    """,
+                    (product_name, shop_name, "sent")
+                )
 
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text
-            )
+                conn.commit()
+
+                cursor.execute(
+                    """
+                    SELECT user_id, product_query
+                    FROM tracked_products
+                    """
+                )
+
+                tracked = cursor.fetchall()
+
+                for user_id, product_query in tracked:
+
+                   if not product_matches(product_query, product_name):
+                           continue
+
+                    price = get_cardmarket_price(product_name)
+
+                    text = (
+                        "🚨 RESTOCK GEFUNDEN 🚨\n\n"
+                        f"📦 Produkt: {product_name}\n"
+                        f"🏪 Shop: {shop_name}\n"
+                        f"💰 Preis: {price}\n\n"
+                        f"🛒 Direktlink:\n{shop_url}"
+                    )
+
+                    try:
+                        await app.bot.send_message(
+                            chat_id=user_id,
+                            text=text
+                        )
+
+                    except Exception as e:
+                        print(e)
+
+            await asyncio.sleep(300)
+
+        except Exception as e:
+            print(e)
+            await asyncio.sleep(30)
+
 
 async def searchshops(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

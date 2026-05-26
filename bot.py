@@ -2516,7 +2516,7 @@ async def auto_shop_restock_check(app):
 
             for product_name, shop_name, shop_url in products:
 
-                status = check_restock(shop_url)
+                status = True
 
                 if status is not True:
 

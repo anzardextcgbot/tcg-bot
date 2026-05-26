@@ -2737,6 +2737,7 @@ def generate_price_chart(product_name, history):
     plt.close()
 
     return filename
+
 async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = " ".join(context.args)
@@ -2773,7 +2774,59 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 def find_gate_product_link(search_url, query):
+
     try:
+
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text.lower()
+
+        links = re.findall(
+            r'href=["\'](.*?)["\']',
+            html
+        )
+
+        query_words = query.lower().split()
+
+        for link in links:
+
+            link_lower = link.lower()
+
+            if "/pokemon-" not in link_lower:
+                continue
+
+            if "display" in link_lower or "trainer" in link_lower:
+
+                matched = 0
+
+                for word in query_words:
+                    if word in link_lower:
+                        matched += 1
+
+                if matched >= 2:
+                    return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
+
+
+def find_product_link(search_url, query):
+
+    try:
+
+        if "gate-to-the-games.de" in search_url:
+            return find_gate_product_link(
+                search_url,
+                query
+            )
+
         response = requests.get(
             search_url,
             timeout=10,
@@ -2782,13 +2835,25 @@ def find_gate_product_link(search_url, query):
 
         html = response.text
 
-        links = re.findall(r'href=["\'](.*?)["\']', html)
+        query_words = query.lower().split()
+
+        links = re.findall(
+            r'href=["\'](.*?)["\']',
+            html
+        )
 
         for link in links:
+
             link_lower = link.lower()
 
-            if all(word in link_lower for word in query.lower().split()):
-                return urljoin(search_url, link)
+            if all(
+                word in link_lower
+                for word in query_words[:2]
+            ):
+                return urljoin(
+                    search_url,
+                    link
+                )
 
         return search_url
 

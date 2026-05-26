@@ -2795,12 +2795,9 @@ def find_gate_product_link(search_url, query):
     except Exception:
         return search_url
 
-def find_product_link(search_url, query):
+def find_gate_product_link(search_url, query):
 
     try:
-
-        if "gate-to-the-games.de" in search_url:
-            return find_gate_product_link(search_url, query)
 
         response = requests.get(
             search_url,
@@ -2808,16 +2805,29 @@ def find_product_link(search_url, query):
             headers={"User-Agent": "Mozilla/5.0"}
         )
 
-        html = response.text
-        query_words = query.lower().split()
+        html = response.text.lower()
 
         links = re.findall(r'href=["\'](.*?)["\']', html)
 
+        query_words = query.lower().split()
+
         for link in links:
+
             link_lower = link.lower()
 
-            if all(word in link_lower for word in query_words[:2]):
-                return urljoin(search_url, link)
+            if "/pokemon-" not in link_lower:
+                continue
+
+            if "display" in link_lower or "trainer" in link_lower:
+
+                matched = 0
+
+                for word in query_words:
+                    if word in link_lower:
+                        matched += 1
+
+                if matched >= 2:
+                    return urljoin(search_url, link)
 
         return search_url
 

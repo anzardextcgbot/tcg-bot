@@ -2862,17 +2862,34 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ich suche passende Shopseiten und bereite Restock-Überwachung vor."
     )
 
+    await update.message.reply_text(
+        f"DEBUG Shops gefunden: {len(SHOP_SEARCH_PATTERNS)}"
+    )
+
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+
         search_url = pattern.format(query=encoded_query)
-        product_url = find_product_link(search_url, search_query)
+
+        product_url = find_product_link(
+            search_url,
+            search_query
+        )
 
         cursor.execute(
             """
             INSERT INTO global_shop_products
-            (product_name, shop_name, shop_url)
+            (
+                product_name,
+                shop_name,
+                shop_url
+            )
             VALUES (?, ?, ?)
             """,
-            (search_query, shop_name, product_url)
+            (
+                search_query,
+                shop_name,
+                product_url
+            )
         )
 
     conn.commit()
@@ -2880,7 +2897,6 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
     )
-
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()

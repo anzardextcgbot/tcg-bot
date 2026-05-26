@@ -2,6 +2,8 @@ import sqlite3
 import requests
 import json
 import matplotlib.pyplot as plt
+import re
+from urllib.parse import urljoin
 
 from telegram import (
     Update,
@@ -2761,6 +2763,30 @@ async def producthistory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=text
         )
 
+def find_product_link(search_url, query):
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text
+        query_words = query.lower().split()
+
+        links = re.findall(r'href=["\'](.*?)["\']', html)
+
+        for link in links:
+            link_lower = link.lower()
+
+            if all(word in link_lower for word in query_words[:2]):
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
 async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
@@ -2783,6 +2809,7 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
         search_url = pattern.format(query=encoded_query)
+        product_url = find_product_link(search_url, search_query)
 
         cursor.execute(
             """
@@ -2790,7 +2817,7 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (product_name, shop_name, shop_url)
             VALUES (?, ?, ?)
             """,
-            (search_query, shop_name, search_url)
+            (search_query, shop_name, product_url)
         )
 
     conn.commit()

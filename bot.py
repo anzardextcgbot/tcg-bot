@@ -2835,6 +2835,7 @@ def find_gate_product_link(search_url, query):
         return search_url
 
 async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     query = " ".join(context.args)
 
     if not query:
@@ -2868,36 +2869,53 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
 
-        search_url = pattern.format(query=encoded_query)
+        try:
 
-        product_url = find_product_link(
-            search_url,
-            search_query
-        )
+            search_url = pattern.format(query=encoded_query)
 
-        cursor.execute(
-            """
-            INSERT INTO global_shop_products
-            (
-                product_name,
-                shop_name,
-                shop_url
+            product_url = find_product_link(
+                search_url,
+                search_query
             )
-            VALUES (?, ?, ?)
-            """,
-            (
-                search_query,
-                shop_name,
-                product_url
-            )
-        )
 
-    conn.commit()
+            cursor.execute(
+                """
+                INSERT INTO global_shop_products
+                (
+                    product_name,
+                    shop_name,
+                    shop_url
+                )
+                VALUES (?, ?, ?)
+                """,
+                (
+                    search_query,
+                    shop_name,
+                    product_url
+                )
+            )
+
+            conn.commit()
+
+        except Exception as e:
+
+            await update.message.reply_text(
+                f"FEHLER bei {shop_name}:\n{e}"
+            )
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM global_shop_products"
+    )
+
+    count = cursor.fetchone()[0]
+
+    await update.message.reply_text(
+        f"DEBUG gespeicherte Produkte: {count}"
+    )
 
     await update.message.reply_text(
         "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
     )
-
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 

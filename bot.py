@@ -2507,8 +2507,6 @@ async def auto_shop_restock_check(app):
 
                 status = check_restock(shop_url)
 
-                alert_key = f"{product_name}_{shop_name}"
-
                 if status is not True:
 
                     cursor.execute(
@@ -2562,8 +2560,8 @@ async def auto_shop_restock_check(app):
 
                 for user_id, product_query in tracked:
 
-                   if not product_matches(product_query, product_name):
-                           continue
+                    if not product_matches(product_query, product_name):
+                        continue
 
                     price = get_cardmarket_price(product_name)
 
@@ -2576,6 +2574,7 @@ async def auto_shop_restock_check(app):
                     )
 
                     try:
+
                         await app.bot.send_message(
                             chat_id=user_id,
                             text=text

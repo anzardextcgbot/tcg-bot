@@ -2505,7 +2505,16 @@ async def auto_shop_restock_check(app):
 
         try:
 
-            for product_name, shop_name, shop_url in GLOBAL_SHOP_PRODUCTS:
+            cursor.execute(
+                """
+                SELECT product_name, shop_name, shop_url
+                FROM global_shop_products
+                """
+            )
+
+            products = cursor.fetchall()
+
+            for product_name, shop_name, shop_url in products:
 
                 status = check_restock(shop_url)
 

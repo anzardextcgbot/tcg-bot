@@ -2038,11 +2038,50 @@ SET_ALIASES = {
     "rising chaos": "wachsendes chaos"
 }
 
+JP_SET_ALIASES = {
+
+    "151 jp": "pokemon card 151",
+    "pokemon 151 jp": "pokemon card 151",
+    "jp 151": "pokemon card 151",
+
+    "vstar universe": "vstar universe",
+
+    "shiny treasure": "shiny treasure ex",
+    "shiny treasure ex": "shiny treasure ex",
+
+    "terastal festival": "terastal festival ex",
+    "terastal festival ex": "terastal festival ex",
+
+    "battle partners": "battle partners",
+
+    "night wanderer": "night wanderer",
+
+    "ruler of the black flame": "ruler of the black flame",
+
+    "super electric breaker": "super electric breaker",
+
+    "crimson haze": "crimson haze",
+
+    "mask of change": "mask of change",
+
+    "paradise dragona": "paradise dragona"
+}
+
 def normalize_product_query(query):
+
     q = query.lower()
 
     for english_name, german_name in SET_ALIASES.items():
-        q = q.replace(english_name, german_name)
+        q = q.replace(
+            english_name,
+            german_name
+        )
+
+    for alias, real_name in JP_SET_ALIASES.items():
+        q = q.replace(
+            alias,
+            real_name
+        )
 
     replacements = {
         "etb": "top trainer box",
@@ -2052,10 +2091,13 @@ def normalize_product_query(query):
         "booster bundle": "booster bundle",
         "mini tin": "mini tin",
         "collection": "collection box"
-}
+    }
 
     for short, full in replacements.items():
-        q = q.replace(short, full)
+        q = q.replace(
+            short,
+            full
+        )
 
     return q
 

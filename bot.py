@@ -2585,7 +2585,6 @@ async def auto_shop_restock_check(app):
     while True:
 
         try:
-
             cursor.execute(
                 """
                 SELECT product_name, shop_name, shop_url
@@ -2600,7 +2599,6 @@ async def auto_shop_restock_check(app):
                 status = check_restock(shop_url)
 
                 if status is not True:
-
                     cursor.execute(
                         """
                         DELETE FROM sent_restock_alerts
@@ -2610,7 +2608,6 @@ async def auto_shop_restock_check(app):
                     )
 
                     conn.commit()
-
                     continue
 
                 cursor.execute(
@@ -2655,15 +2652,14 @@ async def auto_shop_restock_check(app):
                     if not product_matches(product_query, product_name):
                         continue
 
-                    price = get_cardmarket_price(product_name)
-
                     text = (
-    			"🚨 RESTOCK GEFUNDEN 🚨\n\n"
-    	               f"📦 {product_name}\n"
-    		       f"🏪 {shop_name}\n\n"
-    		       f"🛒 Jetzt verfügbar:\n{shop_url}"
- 		    )
+                        "🚨 RESTOCK GEFUNDEN 🚨\n\n"
+                        f"📦 {product_name}\n"
+                        f"🏪 {shop_name}\n\n"
+                        f"🛒 Jetzt verfügbar:\n{shop_url}"
+                    )
 
+                    try:
                         await app.bot.send_message(
                             chat_id=user_id,
                             text=text
@@ -2677,7 +2673,6 @@ async def auto_shop_restock_check(app):
         except Exception as e:
             print(e)
             await asyncio.sleep(30)
-
 
 async def searchshops(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)

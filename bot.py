@@ -2658,14 +2658,11 @@ async def auto_shop_restock_check(app):
                     price = get_cardmarket_price(product_name)
 
                     text = (
-                        "🚨 RESTOCK GEFUNDEN 🚨\n\n"
-                        f"📦 Produkt: {product_name}\n"
-                        f"🏪 Shop: {shop_name}\n"
-                        f"💰 Preis: {price}\n\n"
-                        f"🛒 Direktlink:\n{shop_url}"
-                    )
-
-                    try:
+    			"🚨 RESTOCK GEFUNDEN 🚨\n\n"
+    	               f"📦 {product_name}\n"
+    		       f"🏪 {shop_name}\n\n"
+    		       f"🛒 Jetzt verfügbar:\n{shop_url}"
+ 		    )
 
                         await app.bot.send_message(
                             chat_id=user_id,

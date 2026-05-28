@@ -1254,31 +1254,9 @@ def check_restock(url):
         return None
 
     except Exception:
-        return Noneasync def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text(
-            "Benutze: /checkurl LINK"
-        )
-        return
+        return None
 
-    url = context.args[0]
 
-    result = check_restock(url)
-
-    if result is True:
-        await update.message.reply_text(
-            "✅ Produkt vermutlich verfügbar!"
-        )
-
-    elif result is False:
-        await update.message.reply_text(
-            "❌ Produkt aktuell ausverkauft."
-        )
-
-    else:
-        await update.message.reply_text(
-            "⚠️ Seite konnte nicht geprüft werden."
-        )
 async def check_my_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 

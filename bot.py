@@ -2815,41 +2815,37 @@ def find_gate_product_link(search_url, query):
         response = requests.get(
             search_url,
             timeout=10,
-            headers={"User-Agent": "Mozilla/5.0"}
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
         )
 
-        html = response.text.lower()
+        html = response.text
 
-        links = re.findall(
-            r'href=["\'](.*?)["\']',
+        product_links = re.findall(
+            r'href="(https://www\.gate-to-the-games\.de/[^"]+)"',
             html
         )
 
         query_words = query.lower().split()
 
-        for link in links:
+        for link in product_links:
 
             link_lower = link.lower()
 
-            if "/pokemon-" not in link_lower:
-                continue
+            matched = 0
 
-            if "display" in link_lower or "trainer" in link_lower:
+            for word in query_words:
+                if word in link_lower:
+                    matched += 1
 
-                matched = 0
-
-                for word in query_words:
-                    if word in link_lower:
-                        matched += 1
-
-                if matched >= 2:
-                    return urljoin(search_url, link)
+            if matched >= 2:
+                return link
 
         return search_url
 
     except Exception:
         return search_url
-
 
 def find_gate_product_link(search_url, query):
 

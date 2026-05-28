@@ -1208,6 +1208,7 @@ def extract_shop_price(url):
 def check_restock(url):
 
     try:
+
         response = requests.get(
             url,
             timeout=10,
@@ -1219,36 +1220,41 @@ def check_restock(url):
         html = response.text.lower()
 
         sold_out_words = [
+            "ausverkauft",
             "out of stock",
             "sold out",
             "nicht verfügbar",
-            "ausverkauft",
             "derzeit nicht verfügbar",
-            "momentan nicht verfügbar"
-        ]
-
-        available_words = [
-            "in den warenkorb",
-            "add to cart",
-            "buy now",
-            "kaufen",
-            "verfügbar",
-            "auf lager"
+            "momentan nicht verfügbar",
+            "currently unavailable"
         ]
 
         for word in sold_out_words:
             if word in html:
                 return False
 
+        available_words = [
+            "in den warenkorb",
+            "add to cart",
+            "buy now",
+            "auf lager",
+            "lieferbar",
+            "sofort lieferbar"
+        ]
+
+        hits = 0
+
         for word in available_words:
             if word in html:
-                return True
+                hits += 1
+
+        if hits >= 1:
+            return True
 
         return None
 
     except Exception:
-        return None
-async def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        return Noneasync def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "Benutze: /checkurl LINK"

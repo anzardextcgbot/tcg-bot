@@ -1172,7 +1172,6 @@ async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def extract_shop_price(url):
 
     try:
-
         response = requests.get(
             url,
             timeout=10,
@@ -1183,8 +1182,6 @@ def extract_shop_price(url):
 
         html = response.text
 
-        import re
-
         price_patterns = [
             r"\d+,\d{2}\s?€",
             r"€\s?\d+,\d{2}",
@@ -1192,11 +1189,9 @@ def extract_shop_price(url):
         ]
 
         for pattern in price_patterns:
-
             match = re.search(pattern, html)
 
             if match:
-
                 price = match.group(0)
 
                 if "0,00" in price or "0.00" in price:
@@ -1207,7 +1202,11 @@ def extract_shop_price(url):
         return "Preis nicht gefunden"
 
     except Exception:
-        return "Preis nicht gefunden"def check_restock(url):
+        return "Preis nicht gefunden"
+
+
+def check_restock(url):
+
     try:
         response = requests.get(
             url,
@@ -1230,7 +1229,6 @@ def extract_shop_price(url):
 
         available_words = [
             "in den warenkorb",
-            "warenkorb",
             "add to cart",
             "buy now",
             "kaufen",
@@ -1250,7 +1248,6 @@ def extract_shop_price(url):
 
     except Exception:
         return None
-
 async def checkurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(

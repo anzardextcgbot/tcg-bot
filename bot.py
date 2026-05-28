@@ -1193,12 +1193,12 @@ def extract_shop_price(url):
             match = re.search(pattern, html)
 
             if match:
-                return match.group(0)
+    price = match.group(0)
 
-        return "Preis nicht gefunden"
+    if "0,00" in price or "0.00" in price:
+        continue
 
-    except Exception:
-        return "Preis nicht gefunden"
+    return price
 
 def check_restock(url):
     try:

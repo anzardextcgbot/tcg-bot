@@ -1170,7 +1170,9 @@ async def myurls(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 def extract_shop_price(url):
+
     try:
+
         response = requests.get(
             url,
             timeout=10,
@@ -1190,17 +1192,22 @@ def extract_shop_price(url):
         ]
 
         for pattern in price_patterns:
+
             match = re.search(pattern, html)
 
             if match:
-    price = match.group(0)
 
-    if "0,00" in price or "0.00" in price:
-        continue
+                price = match.group(0)
 
-    return price
+                if "0,00" in price or "0.00" in price:
+                    continue
 
-def check_restock(url):
+                return price
+
+        return "Preis nicht gefunden"
+
+    except Exception:
+        return "Preis nicht gefunden"def check_restock(url):
     try:
         response = requests.get(
             url,

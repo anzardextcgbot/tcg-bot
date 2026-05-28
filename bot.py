@@ -3076,7 +3076,6 @@ def main():
     app.add_handler(CommandHandler("setdrops", setdrops))
     app.add_handler(CommandHandler("trackurl", trackurl))
     app.add_handler(CommandHandler("myurls", myurls))
-    app.add_handler(CommandHandler("checkurl", checkurl))
     app.add_handler(CommandHandler("checkmyurls", check_my_urls))
     app.add_handler(CommandHandler("untrackurl", untrackurl))
     app.add_handler(CallbackQueryHandler(action_button_handler, pattern="^(track_|history_)"))

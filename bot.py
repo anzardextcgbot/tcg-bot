@@ -2511,6 +2511,7 @@ async def listshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(text)
+
 async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute(
         """
@@ -2547,7 +2548,7 @@ async def checkshopproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🛒 {shop_url}\n\n"
         )
 
-    await update.message.reply_text(text))
+    await update.message.reply_text(text)
 
 def product_matches(user_query, product_name):
     user_words = user_query.lower().split()

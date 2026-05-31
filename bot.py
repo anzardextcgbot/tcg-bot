@@ -2908,12 +2908,56 @@ def find_gate_product_link(search_url, query):
     except Exception:
         return search_url
 
+def find_cardbuddys_product_link(search_url, query):
+
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text.lower()
+
+        links = re.findall(
+            r'href=["\'](.*?)["\']',
+            html
+        )
+
+        query_words = query.lower().split()
+
+        for link in links:
+            link_lower = link.lower()
+
+            if "product" not in link_lower and "products" not in link_lower and "pokemon" not in link_lower:
+                continue
+
+            matched = 0
+
+            for word in query_words:
+                if word in link_lower:
+                    matched += 1
+
+            if matched >= 2:
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
 def find_product_link(search_url, query):
 
     try:
 
         if "gate-to-the-games.de" in search_url:
             return find_gate_product_link(
+                search_url,
+                query
+            )
+
+        if "cardbuddys.de" in search_url:
+            return find_cardbuddys_product_link(
                 search_url,
                 query
             )

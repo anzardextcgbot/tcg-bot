@@ -2951,19 +2951,32 @@ def find_games_island_product_link(search_url, query):
             headers={"User-Agent": "Mozilla/5.0"}
         )
 
-        html = response.text.lower()
+        html = response.text
 
         links = re.findall(
             r'href=["\'](.*?)["\']',
             html
         )
 
-        query_words = query.lower().split()
+        query_words = query.lower().replace("&", "").split()
 
         for link in links:
-            link_lower = link.lower()
+            full_link = urljoin(search_url, link)
+            link_lower = full_link.lower()
 
-            if "pokemon" not in link_lower:
+            if "games-island.eu" not in link_lower:
+                continue
+
+            if any(skip in link_lower for skip in [
+                "search",
+                "account",
+                "checkout",
+                "cart",
+                "wishlist",
+                "kontakt",
+                "impressum",
+                "datenschutz"
+            ]):
                 continue
 
             matched = 0
@@ -2972,14 +2985,13 @@ def find_games_island_product_link(search_url, query):
                 if word in link_lower:
                     matched += 1
 
-            if matched >= 1:
-                return urljoin(search_url, link)
+            if matched >= 2:
+                return full_link
 
         return search_url
 
     except Exception:
         return search_url
-
 def find_trader_online_product_link(search_url, query):
 
     try:

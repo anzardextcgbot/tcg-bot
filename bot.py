@@ -3060,6 +3060,101 @@ def find_trader_online_product_link(search_url, query):
     except Exception:
         return search_url
 
+def find_chaos_cards_product_link(search_url, query):
+
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text.lower()
+
+        links = re.findall(r'href=["\'](.*?)["\']', html)
+
+        query_words = query.lower().split()
+
+        for link in links:
+
+            matched = 0
+
+            for word in query_words:
+                if word in link.lower():
+                    matched += 1
+
+            if matched >= 2:
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
+
+def find_plaza_japan_product_link(search_url, query):
+
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text.lower()
+
+        links = re.findall(r'href=["\'](.*?)["\']', html)
+
+        query_words = query.lower().split()
+
+        for link in links:
+
+            matched = 0
+
+            for word in query_words:
+                if word in link.lower():
+                    matched += 1
+
+            if matched >= 2:
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
+
+def find_meccha_japan_product_link(search_url, query):
+
+    try:
+        response = requests.get(
+            search_url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        html = response.text.lower()
+
+        links = re.findall(r'href=["\'](.*?)["\']', html)
+
+        query_words = query.lower().split()
+
+        for link in links:
+
+            matched = 0
+
+            for word in query_words:
+                if word in link.lower():
+                    matched += 1
+
+            if matched >= 2:
+                return urljoin(search_url, link)
+
+        return search_url
+
+    except Exception:
+        return search_url
+
 def find_product_link(search_url, query):
 
     try:
@@ -3084,6 +3179,24 @@ def find_product_link(search_url, query):
 
         if "trader-online.de" in search_url:
             return find_trader_online_product_link(
+                search_url,
+                query
+            )
+
+        if "chaoscards.co.uk" in search_url:
+            return find_chaos_cards_product_link(
+                search_url,
+                query
+            )
+
+        if "plazajapan.com" in search_url:
+            return find_plaza_japan_product_link(
+                search_url,
+                query
+            )
+
+        if "meccha-japan.com" in search_url:
+            return find_meccha_japan_product_link(
                 search_url,
                 query
             )

@@ -3258,10 +3258,6 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ich suche passende Shopseiten und bereite Restock-Überwachung vor."
     )
 
-    await update.message.reply_text(
-        f"DEBUG Shops gefunden: {len(SHOP_SEARCH_PATTERNS)}"
-    )
-
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
 
         try:
@@ -3303,10 +3299,6 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     count = cursor.fetchone()[0]
-
-    await update.message.reply_text(
-        f"DEBUG gespeicherte Produkte: {count}"
-    )
 
     await update.message.reply_text(
         "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
@@ -3367,7 +3359,6 @@ def main():
     app.add_handler(CommandHandler("restocktest", restocktest))
     app.add_handler(CommandHandler("trackshopurl", trackshopurl))
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
-    app.add_handler(CommandHandler("listshopproducts", listshopproducts))
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))
     app.add_handler(CommandHandler("searchshops", searchshops))
     app.add_handler(CommandHandler("findproductpages", findproductpages))
@@ -3377,6 +3368,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(menu_|product_|back_)"))
     app.add_handler(CommandHandler("producthistory", producthistory))
     app.add_handler(CommandHandler("autoproduct", autoproduct))
+    app.add_handler(CommandHandler("listshopproducts",listshopproducts))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

@@ -182,6 +182,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    text_lower = text.lower()
 
     if text == "🔍 Karten suchen":
         await update.message.reply_text(
@@ -190,48 +191,51 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "charizard 151\n"
             "umbreon vmax evolving skies"
         )
+        return
 
-    elif text == "⭐ Tracking":
+    if text == "⭐ Tracking":
         await update.message.reply_text(
             "⭐ Tracking-Menü\n\n"
             "/mycards\n"
             "/untrackcards"
         )
+        return
 
-    elif text == "📈 Preise":
+    if text == "📈 Preise":
         await update.message.reply_text(
             "📈 Preis-Menü\n\n"
             "/preishistory Charizard"
         )
+        return
 
+    product_keywords = [
+        "etb",
+        "display",
+        "booster",
+        "bundle",
+        "mini tin",
+        "upc",
+        "case",
+        "collection",
+        "box",
+        "tin",
+        "premium",
+        "trainer"
+    ]
+
+    is_product = False
+
+    for keyword in product_keywords:
+        if keyword in text_lower:
+            is_product = True
+            break
+
+    context.args = text.split()
+
+    if is_product:
+        await product_search(update, context)
     else:
-        text_lower = text.lower()
-
-        product_keywords = [
-            "etb",
-            "display",
-            "booster",
-            "bundle",
-            "mini tin",
-            "upc",
-            "case",
-            "collection"
-        ]
-
-        is_product = False
-
-        for keyword in product_keywords:
-            if keyword in text_lower:
-                is_product = True
-                break
-
-        context.args = update.message.text.split()
-
-        if is_product:
-            await product_search(update, context)
-        else:
-            await preis(update, context)
-
+        await preis(update, context)
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 

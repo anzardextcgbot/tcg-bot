@@ -2259,17 +2259,18 @@ def get_product_history(query):
 async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     query_lower = query.lower()
+
     PRODUCT_TRENDS[query_lower] = PRODUCT_TRENDS.get(query_lower, 0) + 1
+
     product_type = "Produkt"
 
     for keyword, display_name in PRODUCT_TYPES.items():
-        if keyword in query.lower():
+        if keyword in query_lower:
             product_type = display_name
             break
 
     search_query = normalize_product_query(query)
     product_price = get_product_price(search_query)
-
     product_history = get_product_history(search_query)
     product_trend = get_product_trend(search_query)
 
@@ -2292,8 +2293,8 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton(
-                "🔔 Restock-Link hinzufügen",
-                callback_data="restock_help"
+                "🔔 Produkt beobachten",
+                callback_data=f"trackproduct_{search_query}"
             )
         ]
     ]
@@ -2307,16 +2308,14 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 <b>Preis:</b> {product_price}\n"
         f"📈 <b>Trend:</b> {product_trend}\n\n"
         f"📊 <b>Verlauf:</b>\n{history_text}\n\n"
-        f"🛒 Öffne Cardmarket über den Button.\n"
-        f"🔔 Für Restock kannst du später Produktlinks speichern."
-)
+        f"🛒 Cardmarket öffnen oder Produkt direkt beobachten."
+    )
 
     await update.message.reply_text(
         text,
         parse_mode="HTML",
         reply_markup=reply_markup
     )
-
 async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
@@ -3323,6 +3322,30 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✅ Produkt wurde automatisch für alle bekannten Shops vorbereitet."
     )
+
+async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = str(query.from_user.id)
+    data = query.data
+
+    product_name = data.replace("trackproduct_", "")
+
+    cursor.execute(
+        """
+        INSERT INTO tracked_products (user_id, product_query)
+        VALUES (?, ?)
+        """,
+        (user_id, product_name)
+    )
+
+    conn.commit()
+
+    await query.message.reply_text(
+        f"🔔 Produkt wird beobachtet:\n{product_name}"
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -3389,6 +3412,7 @@ def main():
     app.add_handler(CommandHandler("producthistory", producthistory))
     app.add_handler(CommandHandler("autoproduct", autoproduct))
     app.add_handler(CommandHandler("listshopproducts",listshopproducts))
+    app.add_handler(CallbackQueryHandler(product_button_handler, pattern="^trackproduct_"))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

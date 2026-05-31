@@ -2972,7 +2972,7 @@ def find_games_island_product_link(search_url, query):
                 if word in link_lower:
                     matched += 1
 
-            if matched >= 2:
+            if matched >= 1:
                 return urljoin(search_url, link)
 
         return search_url

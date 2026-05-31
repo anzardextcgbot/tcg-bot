@@ -3258,6 +3258,10 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ich suche passende Shopseiten und bereite Restock-Überwachung vor."
     )
 
+    await update.message.reply_text(
+        f"DEBUG Shops gefunden: {len(SHOP_SEARCH_PATTERNS)}"
+    )
+
     for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
 
         try:

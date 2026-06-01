@@ -194,7 +194,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "⭐ Tracking":
-        await myproducts(update, context)
+        await mytracking(update, context)
         return
 
     product_keywords = [
@@ -3518,6 +3518,49 @@ async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for product in products:
         text += f"📦 {product[0]}\n"
+
+    await update.message.reply_text(text)
+
+async def mytracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT product_query
+        FROM tracked_products
+        WHERE user_id = ?
+        ORDER BY product_query
+        """,
+        (user_id,)
+    )
+    products = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT card_name
+        FROM tracked_cards
+        WHERE user_id = ?
+        ORDER BY card_name
+        """,
+        (user_id,)
+    )
+    cards = cursor.fetchall()
+
+    text = "⭐ Deine Beobachtungen\n\n"
+
+    text += "📦 Produkte\n"
+    if products:
+        for product in products:
+            text += f"• {product[0]}\n"
+    else:
+        text += "Keine Produkte\n"
+
+    text += "\n🃏 Karten\n"
+    if cards:
+        for card in cards:
+            text += f"• {card[0]}\n"
+    else:
+        text += "Keine Karten\n"
 
     await update.message.reply_text(text)
 

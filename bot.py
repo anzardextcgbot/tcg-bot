@@ -3439,17 +3439,16 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     existing = cursor.fetchone()
 
-    if existing:
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "❌ Nicht mehr beobachten",
-                    callback_data=f"removeproduct_{product_name}"
-                )
-            ]
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "❌ Nicht mehr beobachten",
+                callback_data=f"removeproduct_{product_name}"
+            )
         ]
+    ]
 
+    if existing:
         await query.message.reply_text(
             f"🔔 Bereits beobachtet:\n\n"
             f"📦 {product_name}",
@@ -3466,24 +3465,41 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         (user_id, product_name)
     )
 
-    conn.commit()
+    encoded_query = product_name.replace(" ", "+")
 
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "❌ Nicht mehr beobachten",
-                callback_data=f"removeproduct_{product_name}"
-            )
-        ]
-    ]
+    cursor.execute(
+        """
+        DELETE FROM global_shop_products
+        WHERE product_name = ?
+        """,
+        (product_name,)
+    )
+
+    for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+        search_url = pattern.format(query=encoded_query)
+
+        product_url = find_product_link(
+            search_url,
+            product_name
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO global_shop_products
+            (product_name, shop_name, shop_url)
+            VALUES (?, ?, ?)
+            """,
+            (product_name, shop_name, product_url)
+        )
+
+    conn.commit()
 
     await query.message.reply_text(
         f"🔔 Produkt wird beobachtet:\n\n"
         f"📦 {product_name}\n\n"
         f"🚨 Restock-Überwachung aktiviert.",
         reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = str(update.effective_user.id)
 

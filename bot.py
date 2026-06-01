@@ -3417,7 +3417,6 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     query = update.callback_query
     await query.answer()
 
@@ -3430,6 +3429,24 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     cursor.execute(
         """
+        SELECT 1
+        FROM tracked_products
+        WHERE user_id = ?
+        AND product_query = ?
+        """,
+        (user_id, product_name)
+    )
+
+    existing = cursor.fetchone()
+
+    if existing:
+        await query.message.reply_text(
+            f"🔔 Bereits beobachtet:\n{product_name}"
+        )
+        return
+
+    cursor.execute(
+        """
         INSERT INTO tracked_products
         (user_id, product_query)
         VALUES (?, ?)
@@ -3438,52 +3455,6 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
     conn.commit()
-
-    try:
-
-        encoded_query = product_name.replace(
-            " ",
-            "+"
-        )
-
-        cursor.execute(
-            """
-            DELETE FROM global_shop_products
-            WHERE product_name = ?
-            """,
-            (product_name,)
-        )
-
-        conn.commit()
-
-        for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
-
-            search_url = pattern.format(
-                query=encoded_query
-            )
-
-            product_url = find_product_link(
-                search_url,
-                product_name
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO global_shop_products
-                (product_name, shop_name, shop_url)
-                VALUES (?, ?, ?)
-                """,
-                (
-                    product_name,
-                    shop_name,
-                    product_url
-                )
-            )
-
-        conn.commit()
-
-    except Exception as e:
-        print(e)
 
     await query.message.reply_text(
         f"🔔 Produkt wird beobachtet:\n\n"
@@ -3532,6 +3503,7 @@ async def mytracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """,
         (user_id,)
     )
+
     products = cursor.fetchall()
 
     cursor.execute(
@@ -3543,25 +3515,56 @@ async def mytracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """,
         (user_id,)
     )
+
     cards = cursor.fetchall()
 
-    text = "⭐ Deine Beobachtungen\n\n"
+    if not products and not cards:
+        await update.message.reply_text(
+            "Du beobachtest aktuell nichts."
+        )
+        return
 
-    text += "📦 Produkte\n"
+    await update.message.reply_text("⭐ Deine Beobachtungen")
+
     if products:
+        await update.message.reply_text("📦 Produkte")
+
         for product in products:
-            text += f"• {product[0]}\n"
-    else:
-        text += "Keine Produkte\n"
+            product_name = product[0]
 
-    text += "\n🃏 Karten\n"
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "❌ Entfernen",
+                        callback_data=f"removeproduct_{product_name}"
+                    )
+                ]
+            ]
+
+            await update.message.reply_text(
+                f"📦 {product_name}",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
     if cards:
-        for card in cards:
-            text += f"• {card[0]}\n"
-    else:
-        text += "Keine Karten\n"
+        await update.message.reply_text("🃏 Karten")
 
-    await update.message.reply_text(text)
+        for card in cards:
+            card_name = card[0]
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "❌ Entfernen",
+                        callback_data=f"removecard_{card_name}"
+                    )
+                ]
+            ]
+
+            await update.message.reply_text(
+                f"🃏 {card_name}",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
 
 async def restocktest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 

@@ -224,7 +224,9 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_product:
         await product_search(update, context)
     else:
-        await preis(update, context)async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await preis(update, context)
+
+async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     if not query:
@@ -2312,8 +2314,8 @@ async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🔔 Produkt wird beobachtet:\n{query}"
     )
-
 async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = str(update.effective_user.id)
 
     cursor.execute(
@@ -2321,6 +2323,7 @@ async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         SELECT product_query
         FROM tracked_products
         WHERE user_id = ?
+        ORDER BY product_query
         """,
         (user_id,)
     )
@@ -2333,24 +2336,60 @@ async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    text = "🔔 <b>Deine beobachteten Produkte:</b>\n\n"
-
-    for product in products:
-        text += f"• {product[0]}\n"
-
     await update.message.reply_text(
-        text,
-        parse_mode="HTML"
+        "🔔 Deine beobachteten Produkte:"
     )
 
-async def restocktest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=(
-            "🚨 RESTOCK ALARM!\n\n"
-            "📦 Pokémon 151 ETB\n"
-            "🛒 Produkt möglicherweise wieder verfügbar!"
+    for product in products:
+
+        product_name = product[0]
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "❌ Entfernen",
+                    callback_data=f"removeproduct_{product_name}"
+                )
+            ]
+        ]
+
+        reply_markup = InlineKeyboardMarkup(
+            keyboard
         )
+
+        await update.message.reply_text(
+            f"📦 {product_name}",
+            reply_markup=reply_markup
+        )
+
+async def remove_product_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    user_id = str(query.from_user.id)
+
+    product_name = query.data.replace(
+        "removeproduct_",
+        ""
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM tracked_products
+        WHERE user_id = ?
+        AND product_query = ?
+        """,
+        (
+            user_id,
+            product_name
+        )
+    )
+
+    conn.commit()
+
+    await query.message.edit_text(
+        f"❌ Entfernt:\n{product_name}"
     )
 
 async def checkproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3467,6 +3506,7 @@ def main():
     app.add_handler(CommandHandler("listshopproducts",listshopproducts))
     app.add_handler(CallbackQueryHandler(product_button_handler, pattern="^trackproduct_"))
     app.add_handler(CommandHandler("myproducts",myproducts))
+    app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

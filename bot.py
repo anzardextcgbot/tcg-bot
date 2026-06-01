@@ -1811,6 +1811,7 @@ def load_all_sets():
 ALL_SETS = load_all_sets()
 
 async def mycards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = str(update.effective_user.id)
 
     cursor.execute(
@@ -1818,22 +1819,74 @@ async def mycards(update: Update, context: ContextTypes.DEFAULT_TYPE):
         SELECT card_name
         FROM tracked_cards
         WHERE user_id = ?
+        ORDER BY card_name
         """,
         (user_id,)
     )
 
-    results = cursor.fetchall()
+    cards = cursor.fetchall()
 
-    if not results:
-        await update.message.reply_text("Du trackst noch keine Karten.")
+    if not cards:
+        await update.message.reply_text(
+            "Du trackst noch keine Karten."
+        )
         return
 
-    text = "⭐ Deine getrackten Karten:\n\n"
+    await update.message.reply_text(
+        "🃏 Deine beobachteten Karten:"
+    )
 
-    for row in results:
-        text += f"🃏 {row[0]}\n"
+    for card in cards:
 
-    await update.message.reply_text(text)
+        card_name = card[0]
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "❌ Entfernen",
+                    callback_data=f"removecard_{card_name}"
+                )
+            ]
+        ]
+
+        reply_markup = InlineKeyboardMarkup(
+            keyboard
+        )
+
+        await update.message.reply_text(
+            f"🃏 {card_name}",
+            reply_markup=reply_markup
+        )
+
+async def remove_card_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    user_id = str(query.from_user.id)
+
+    card_name = query.data.replace(
+        "removecard_",
+        ""
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM tracked_cards
+        WHERE user_id = ?
+        AND card_name = ?
+        """,
+        (
+            user_id,
+            card_name
+        )
+    )
+
+    conn.commit()
+
+    await query.message.edit_text(
+        f"❌ Karte entfernt:\n{card_name}"
+    )
 
 async def untrackcards(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -3537,6 +3590,7 @@ def main():
     app.add_handler(CommandHandler("myproducts",myproducts))
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
+    app.add_handler(CallbackQueryHandler(remove_card_handler,pattern="^removecard_"))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

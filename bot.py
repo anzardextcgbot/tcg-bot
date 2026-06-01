@@ -3597,6 +3597,59 @@ async def restocktest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "https://example.com"
     )
 
+async def checkproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = " ".join(context.args).lower()
+
+    if not query:
+        await update.message.reply_text(
+            "Benutzung:\n/checkproduct 151 etb"
+        )
+        return
+
+    cursor.execute(
+        """
+        SELECT product_name, shop_name, shop_url
+        FROM global_shop_products
+        """
+    )
+
+    products = cursor.fetchall()
+
+    text = f"📦 {query}\n\n"
+
+    found = False
+
+    for product_name, shop_name, shop_url in products:
+
+        if query not in product_name.lower():
+            continue
+
+        found = True
+
+        status = check_restock(shop_url)
+
+        if status is True:
+            status_text = "✅ Verfügbar"
+
+        elif status is False:
+            status_text = "❌ Ausverkauft"
+
+        else:
+            status_text = "⚠️ Unbekannt"
+
+        text += (
+            f"🏪 {shop_name}\n"
+            f"{status_text}\n"
+            f"{shop_url}\n\n"
+        )
+
+    if not found:
+        text = "Keine gespeicherten Produkte gefunden."
+
+    await update.message.reply_text(text)
+
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -3668,6 +3721,8 @@ def main():
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(CallbackQueryHandler(remove_card_handler,pattern="^removecard_"))
     app.add_handler(CommandHandler("restocktest",restocktest))
+    app.add_handler(CommandHandler("checkproduct",checkproduct))
+
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

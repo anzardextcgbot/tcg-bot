@@ -2392,6 +2392,36 @@ async def remove_product_handler(update: Update, context: ContextTypes.DEFAULT_T
         f"❌ Entfernt:\n{product_name}"
     )
 
+async def remove_product_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    user_id = str(query.from_user.id)
+
+    product_name = query.data.replace(
+        "removeproduct_",
+        ""
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM tracked_products
+        WHERE user_id = ?
+        AND product_query = ?
+        """,
+        (
+            user_id,
+            product_name
+        )
+    )
+
+    conn.commit()
+
+    await query.message.edit_text(
+        f"❌ Entfernt:\n{product_name}"
+    )
+
 async def checkproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
 
@@ -3505,6 +3535,7 @@ def main():
     app.add_handler(CommandHandler("listshopproducts",listshopproducts))
     app.add_handler(CallbackQueryHandler(product_button_handler, pattern="^trackproduct_"))
     app.add_handler(CommandHandler("myproducts",myproducts))
+    app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(
 

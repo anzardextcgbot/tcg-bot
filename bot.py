@@ -402,6 +402,7 @@ async def send_card_details(message, card):
     )
 
     cardmarket_url = card.get("cardmarket", {}).get("url")
+    print(card.get("cardmarket"))
 
     keyboard = [
         [

@@ -2298,7 +2298,9 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text,
         parse_mode="HTML",
         reply_markup=reply_markup
-    )async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )
+
+async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     if not query:

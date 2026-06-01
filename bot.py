@@ -3491,7 +3491,6 @@ def main():
     app.add_handler(CommandHandler("trackproduct", trackproduct))
     app.add_handler(CommandHandler("myproducts", myproducts))
     app.add_handler(CommandHandler("checkproducts", checkproducts))
-    app.add_handler(CommandHandler("restocktest", restocktest))
     app.add_handler(CommandHandler("trackshopurl", trackshopurl))
     app.add_handler(CommandHandler("addshopproduct", addshopproduct))
     app.add_handler(CommandHandler("checkshopproducts", checkshopproducts))

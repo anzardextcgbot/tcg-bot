@@ -401,8 +401,10 @@ async def send_card_details(message, card):
         f"📊 <b>Durchschnitt:</b> {average_sell_price} €"
     )
 
-    cardmarket_url = card.get("cardmarket", {}).get("url")
-    print(card.get("cardmarket"))
+    cardmarket_url = (
+        "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="
+        + f"{name} {set_name}".replace(" ", "+")
+    )
 
     keyboard = [
         [
@@ -410,18 +412,14 @@ async def send_card_details(message, card):
                 "⭐ Karte beobachten",
                 callback_data=f"track_{name}"
             )
+        ],
+        [
+            InlineKeyboardButton(
+                "🛒 Cardmarket öffnen",
+                url=cardmarket_url
+            )
         ]
     ]
-
-    if cardmarket_url:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    "🛒 Cardmarket",
-                    url=cardmarket_url
-                )
-            ]
-        )
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -3565,6 +3563,16 @@ async def mytracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def restocktest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.message.reply_text(
+        "🚨 RESTOCK GEFUNDEN 🚨\n\n"
+        "📦 Pokémon 151 ETB\n"
+        "🏪 Test Shop\n\n"
+        "🛒 Jetzt verfügbar:\n"
+        "https://example.com"
+    )
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -3635,6 +3643,7 @@ def main():
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(CallbackQueryHandler(remove_product_handler,pattern="^removeproduct_"))
     app.add_handler(CallbackQueryHandler(remove_card_handler,pattern="^removecard_"))
+    app.add_handler(CommandHandler("restocktest",restocktest))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

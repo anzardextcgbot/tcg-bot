@@ -3456,11 +3456,21 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     conn.commit()
 
-    await query.message.reply_text(
-        f"🔔 Produkt wird beobachtet:\n\n"
-        f"📦 {product_name}\n\n"
-        f"🚨 Restock-Überwachung aktiviert."
-    )
+   keyboard = [
+    [
+        InlineKeyboardButton(
+            "❌ Nicht mehr beobachten",
+            callback_data=f"removeproduct_{product_name}"
+        )
+    ]
+]
+
+await query.message.reply_text(
+    f"🔔 Produkt wird beobachtet:\n\n"
+    f"📦 {product_name}\n\n"
+    f"🚨 Restock-Überwachung aktiviert.",
+    reply_markup=InlineKeyboardMarkup(keyboard)
+)
 
 async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 

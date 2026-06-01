@@ -2264,14 +2264,6 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
 
     search_query = normalize_product_query(query)
-    product_price = get_product_price(search_query)
-    product_history = get_product_history(search_query)
-    product_trend = get_product_trend(search_query)
-
-    history_text = ""
-
-    if product_history:
-        history_text = "\n".join(product_history[-5:])
 
     cardmarket_search_url = (
         "https://www.cardmarket.com/de/Pokemon/Products/Search?searchString="
@@ -2281,7 +2273,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton(
-                "🛒 Auf Cardmarket suchen",
+                "🛒 Cardmarket öffnen",
                 url=cardmarket_search_url
             )
         ],
@@ -2296,21 +2288,17 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = (
-        f"📦 <b>Produktsuche</b>\n\n"
+        f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
-        f"📦 <b>Produkttyp:</b> {product_type}\n"
-        f"💰 <b>Preis:</b> {product_price}\n"
-        f"📈 <b>Trend:</b> {product_trend}\n\n"
-        f"📊 <b>Verlauf:</b>\n{history_text}\n\n"
-        f"🛒 Cardmarket öffnen oder Produkt direkt beobachten."
+        f"📦 <b>Typ:</b> {product_type}\n\n"
+        f"🛒 Öffne Cardmarket oder beobachte das Produkt."
     )
 
     await update.message.reply_text(
         text,
         parse_mode="HTML",
         reply_markup=reply_markup
-    )
-async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )async def trackproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     if not query:

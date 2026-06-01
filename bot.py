@@ -3499,7 +3499,9 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         f"📦 {product_name}\n\n"
         f"🚨 Restock-Überwachung aktiviert.",
         reply_markup=InlineKeyboardMarkup(keyboard)
-    )async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    )
+
+async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = str(update.effective_user.id)
 

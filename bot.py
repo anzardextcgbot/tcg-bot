@@ -395,7 +395,6 @@ async def send_card_details(message, card):
     rarity = card.get("rarity", "Unbekannt")
 
     image_url = card.get("images", {}).get("large")
-
     prices = card.get("cardmarket", {}).get("prices", {})
 
     trend_price = prices.get("trendPrice", "Keine Daten")
@@ -417,12 +416,8 @@ async def send_card_details(message, card):
     keyboard = [
         [
             InlineKeyboardButton(
-                "⭐ Track / Untrack",
+                "⭐ Karte beobachten",
                 callback_data=f"track_{name}"
-            ),
-            InlineKeyboardButton(
-                "📈 Verlauf",
-                callback_data=f"history_{name}"
             )
         ]
     ]
@@ -452,7 +447,6 @@ async def send_card_details(message, card):
             parse_mode="HTML",
             reply_markup=reply_markup
         )
-
 async def set_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_name = " ".join(context.args)
 

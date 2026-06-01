@@ -194,18 +194,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "⭐ Tracking":
-        await update.message.reply_text(
-            "⭐ Tracking-Menü\n\n"
-            "/mycards\n"
-            "/untrackcards"
-        )
-        return
-
-    if text == "📈 Preise":
-        await update.message.reply_text(
-            "📈 Preis-Menü\n\n"
-            "/preishistory Charizard"
-        )
+        await myproducts(update, context)
         return
 
     product_keywords = [
@@ -235,8 +224,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_product:
         await product_search(update, context)
     else:
-        await preis(update, context)
-async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await preis(update, context)async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     if not query:
@@ -3308,17 +3296,21 @@ async def autoproduct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     query = update.callback_query
     await query.answer()
 
     user_id = str(query.from_user.id)
-    data = query.data
 
-    product_name = data.replace("trackproduct_", "")
+    product_name = query.data.replace(
+        "trackproduct_",
+        ""
+    )
 
     cursor.execute(
         """
-        INSERT INTO tracked_products (user_id, product_query)
+        INSERT INTO tracked_products
+        (user_id, product_query)
         VALUES (?, ?)
         """,
         (user_id, product_name)
@@ -3326,9 +3318,86 @@ async def product_button_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     conn.commit()
 
+    try:
+
+        encoded_query = product_name.replace(
+            " ",
+            "+"
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM global_shop_products
+            WHERE product_name = ?
+            """,
+            (product_name,)
+        )
+
+        conn.commit()
+
+        for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+
+            search_url = pattern.format(
+                query=encoded_query
+            )
+
+            product_url = find_product_link(
+                search_url,
+                product_name
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO global_shop_products
+                (product_name, shop_name, shop_url)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    product_name,
+                    shop_name,
+                    product_url
+                )
+            )
+
+        conn.commit()
+
+    except Exception as e:
+        print(e)
+
     await query.message.reply_text(
-        f"🔔 Produkt wird beobachtet:\n{product_name}"
+        f"🔔 Produkt wird beobachtet:\n\n"
+        f"📦 {product_name}\n\n"
+        f"🚨 Restock-Überwachung aktiviert."
     )
+
+async def myproducts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = str(update.effective_user.id)
+
+    cursor.execute(
+        """
+        SELECT product_query
+        FROM tracked_products
+        WHERE user_id = ?
+        ORDER BY product_query
+        """,
+        (user_id,)
+    )
+
+    products = cursor.fetchall()
+
+    if not products:
+        await update.message.reply_text(
+            "Du beobachtest aktuell keine Produkte."
+        )
+        return
+
+    text = "⭐ Beobachtete Produkte\n\n"
+
+    for product in products:
+        text += f"📦 {product[0]}\n"
+
+    await update.message.reply_text(text)
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -3397,6 +3466,7 @@ def main():
     app.add_handler(CommandHandler("autoproduct", autoproduct))
     app.add_handler(CommandHandler("listshopproducts",listshopproducts))
     app.add_handler(CallbackQueryHandler(product_button_handler, pattern="^trackproduct_"))
+    app.add_handler(CommandHandler("myproducts",myproducts))
     app.add_handler(
 
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler)

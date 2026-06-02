@@ -1108,11 +1108,16 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower().strip()
 
-    # JP-Erkennung: wenn " jp" am Ende oder ein JP-Set-Name vorkommt → JP-Suche
-    is_jp = query_lower.endswith(" jp")
+    # JP-Erkennung: " jp" am Ende, JP-Set-Name oder DE-Set-Name mit "jp"
+    is_jp = query_lower.endswith(" jp") or " jp " in query_lower
     if not is_jp:
         for jp_name in JP_SET_IDS.keys():
             if jp_name in query_lower:
+                is_jp = True
+                break
+    if not is_jp:
+        for de_set in DE_SET_TO_JP.keys():
+            if de_set in query_lower:
                 is_jp = True
                 break
     if is_jp:
@@ -1124,28 +1129,53 @@ async def _search_card(message, query: str):
             if jp_query.startswith(de_name) or f" {de_name} " in f" {jp_query} ":
                 jp_query = jp_query.replace(de_name, en_name, 1)
                 break
-        # JP-Set erkennen
+        # JP-Set erkennen – "151 jp" → sv2a, "shiny treasure" → sv4a usw.
         matched_set_id = None
-        for jp_name, set_id in JP_SET_IDS.items():
-            if jp_name in jp_query:
-                matched_set_id = set_id
-                jp_query = jp_query.replace(jp_name, "").strip()
-                break
+
+        # Set erkennen: erst DE-Set-Namen prüfen, dann JP-Set-Namen, dann "151"
+        if "151" in jp_query and not any(s in jp_query for s in ["shiny", "treasure", "climax"]):
+            matched_set_id = "sv2a"
+            jp_query = jp_query.replace("151", "").strip()
+        else:
+            # Zuerst deutsche Set-Namen probieren
+            matched_set_id = None
+            for de_set, set_id in DE_SET_TO_JP.items():
+                if de_set in jp_query:
+                    matched_set_id = set_id
+                    jp_query = jp_query.replace(de_set, "").strip()
+                    break
+            # Dann JP Set-Namen
+            if not matched_set_id:
+                for jp_name, set_id in JP_SET_IDS.items():
+                    if jp_name in jp_query:
+                        matched_set_id = set_id
+                        jp_query = jp_query.replace(jp_name, "").strip()
+                        break
+
         # " jp" suffix entfernen
         jp_query = jp_query.replace(" jp", "").strip()
         if not jp_query:
             await message.reply_text("❌ Bitte einen Kartennamen angeben.")
             return
-        # API-Suche
+
+        # API-Suche mit Retry
         url = "https://api.pokemontcg.io/v2/cards"
-        api_q = f'name:"{jp_query}"' + (f" set.id:{matched_set_id}" if matched_set_id else "")
-        try:
-            resp  = requests.get(url, params={"q": api_q, "pageSize": 20}, timeout=10)
-            cards = resp.json().get("data", [])
-        except Exception:
-            cards = []
+        cards = []
+        for attempt_q in [f'name:"{jp_query}"', f"name:{jp_query}"]:
+            full_q = attempt_q + (f" set.id:{matched_set_id}" if matched_set_id else "")
+            try:
+                resp  = requests.get(url, params={"q": full_q, "pageSize": 20}, timeout=15)
+                cards = resp.json().get("data", [])
+                if cards:
+                    break
+            except Exception as e:
+                print(f"⚠️ JP API Fehler: {e}")
+
         if not cards:
-            await message.reply_text(f"❌ Keine JP-Karte gefunden für: {jp_query}")
+            await message.reply_text(
+                f"❌ Keine Karte gefunden für: <b>{jp_query}</b>\n\nTipp: Englischen Namen benutzen.\nSchiggy → squirtle · Glurak → charizard",
+                parse_mode="HTML"
+            )
             return
         user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
         last_search_results[user_id] = cards[:8]
@@ -2019,33 +2049,86 @@ DE_TO_EN_POKEMON = {
 }
 
 # JP Set-IDs für die API
+# JP Set-IDs – EN JP-Name → Pokémon TCG API Set-ID
 JP_SET_IDS = {
-    "151 jp":                "sv2a",
-    "pokemon card 151":      "sv2a",
-    "shiny treasure":        "sv4a",
-    "shiny treasure ex":     "sv4a",
-    "vstar universe":        "swsh12pt5",
-    "ruler of the black flame": "sv3a",
-    "terastal festival":     "sv6a",
-    "terastal festival ex":  "sv6a",
-    "night wanderer":        "sv6pt5",
-    "battle partners":       "sv9",
-    "crimson haze":          "sv5a",
-    "mask of change":        "sv6",
-    "wild force":            "sv5M",
-    "cyber judge":           "sv5R",
-    "paradise dragona":      "sv7R",
-    "ancient roar":          "sv4M",
-    "future flash":          "sv4K",
-    "clay burst":            "sv2D",
-    "snow hazard":           "sv2P",
-    "triplet beat":          "sv1a",
-    "dark phantasma":        "swsh11a",
-    "incandescent arcana":   "swsh11",
-    "lost abyss":            "swsh10a",
-    "vmax climax":           "swsh8a",
-    "blue sky stream":       "swsh7a",
-    "eevee heroes":          "swsh6a",
+    # ── Scarlet & Violet JP ────────────────────────────────
+    "151 jp":                    "sv2a",   # Pokémon Card 151
+    "pokemon card 151":          "sv2a",
+    "triplet beat":              "sv1a",   # = Scarlet & Violet 151 Vorstufe
+    "clay burst":                "sv2D",   # = Paldea Evolved Teil
+    "snow hazard":               "sv2P",
+    "ruler of the black flame":  "sv3a",   # = Obsidian Flames JP
+    "ancient roar":              "sv4M",   # = Paradox Rift JP Teil
+    "future flash":              "sv4K",
+    "wild force":                "sv5M",   # = Temporal Forces JP
+    "cyber judge":               "sv5R",
+    "crimson haze":              "sv5a",   # = Twilight Masquerade JP
+    "mask of change":            "sv6",    # = Shrouded Fable JP
+    "night wanderer":            "sv6pt5",
+    "terastal festival":         "sv6a",   # = Prismatische Entwicklungen JP
+    "terastal festival ex":      "sv6a",
+    "stellar miracle":           "sv7",    # = Stellar Crown JP
+    "paradise dragona":          "sv7R",   # = Surging Sparks JP
+    "super electric breaker":    "sv8",    # = Journey Together JP
+    "battle partners":           "sv9",    # = Destined Rivals JP
+    "shiny treasure":            "sv4a",   # = Paldean Fates JP
+    "shiny treasure ex":         "sv4a",
+    # ── Sword & Shield JP ──────────────────────────────────
+    "vstar universe":            "swsh12pt5", # = Crown Zenith JP
+    "incandescent arcana":       "swsh11",    # = Silver Tempest JP
+    "lost abyss":                "swsh10a",   # = Lost Origin JP
+    "dark phantasma":            "swsh11a",
+    "vmax climax":               "swsh8a",    # = Brilliant Stars JP
+    "blue sky stream":           "swsh7a",    # = Evolving Skies JP
+    "eevee heroes":              "swsh6a",    # = Chilling Reign JP
+    "peerless fighters":         "swsh5a",    # = Battle Styles JP
+    "single strike master":      "swsh5S",
+    "rapid strike master":       "swsh5R",
+    "shiny star v":              "swsh4a",    # = Vivid Voltage JP
+    "amazing volt tackle":       "swsh4",
+    "legendary heartbeat":       "swsh3a",    # = Darkness Ablaze JP
+    "infinity zone":             "swsh3",
+    "rebel clash jp":            "swsh2",
+    # ── Kurzformen & Alternativen ──────────────────────────
+    "terastal":                  "sv6a",
+    "prismatische entwicklungen":"sv6a",
+    "prismatische":              "sv6a",
+    "shiny":                     "sv4a",
+    "vmax":                      "swsh8a",
+    "climax":                    "swsh8a",
+    "151":                       "sv2a",
+}
+
+# Deutsche Set-Namen → JP Set-ID
+# So kann man "nachtara prismatische entwicklungen jp" schreiben
+DE_SET_TO_JP = {
+    # Scarlet & Violet
+    "prismatische entwicklungen":  "sv6a",   # Terastal Festival ex
+    "maskerade im zwielicht":      "sv5a",   # Crimson Haze
+    "verborgene fabel":            "sv6",    # Mask of Change
+    "stellarkrone":                "sv7",    # Stellar Miracle
+    "stürmische funken":           "sv7R",   # Paradise Dragona
+    "zeitliche mächte":            "sv5M",   # Wild Force / Cyber Judge
+    "twilight masquerade jp":      "sv5a",
+    "paldeas schicksale":          "sv4a",   # Shiny Treasure ex
+    "paradoxrift":                 "sv4M",   # Ancient Roar / Future Flash
+    "obsidianflammen":             "sv3a",   # Ruler of the Black Flame
+    "entwicklungen in paldea":     "sv2D",   # Clay Burst / Snow Hazard
+    "151 jp":                      "sv2a",
+    "reisegefährten":              "sv8",    # Super Electric Breaker
+    "ewige rivalen":               "sv9",    # Battle Partners
+    # Sword & Shield
+    "zenit der könige":            "swsh12pt5", # VSTAR Universe
+    "silberne sturmwinde":         "swsh11",    # Incandescent Arcana
+    "verlorener ursprung":         "swsh10a",   # Lost Abyss
+    "strahlende sterne":           "swsh8a",    # VMAX Climax
+    "drachenwandel":               "swsh7a",    # Blue Sky Stream
+    "schaurige herrschaft":        "swsh6a",    # Eevee Heroes
+    "kampfstile":                  "swsh5a",    # Peerless Fighters
+    "farbenschock":                "swsh4",     # Amazing Volt Tackle
+    "flammen der finsternis":      "swsh3a",    # Legendary Heartbeat
+    "fusionsangriff":              "swsh8",     # Fusion Arts JP
+    "astralglanz":                 "swsh10",    # Lost Origin JP Basis
 }
 
 async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2053,25 +2136,24 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "🇯🇵 <b>Japanische Karten suchen</b>\n\n"
-            "Benutze: /jp KARTENNAME SET\n\n"
-            "<b>Beispiele:</b>\n"
-            "/jp squirtle 151 jp\n"
-            "/jp shiggy 151 jp\n"
+            "Benutze: /jp KARTENNAME SET\n"
+            "Oder einfach: KARTENNAME SET jp\n\n"
+            "<b>Mit deutschen Set-Namen:</b>\n"
+            "/jp nachtara prismatische entwicklungen\n"
+            "/jp glurak 151 jp\n"
+            "/jp pikachu schaurige herrschaft\n"
+            "/jp umbreon drachenwandel\n\n"
+            "<b>Mit JP-Set-Namen:</b>\n"
             "/jp charizard shiny treasure ex\n"
-            "/jp pikachu vstar universe\n"
             "/jp umbreon vmax climax\n\n"
-            "<b>Verfügbare JP-Sets:</b>\n"
-            "• 151 jp\n"
-            "• shiny treasure ex\n"
-            "• vstar universe\n"
-            "• ruler of the black flame\n"
-            "• terastal festival\n"
-            "• night wanderer\n"
-            "• battle partners\n"
-            "• crimson haze\n"
-            "• wild force / cyber judge\n"
-            "• vmax climax\n"
-            "• eevee heroes",
+            "<b>DE → JP Set-Übersetzung:</b>\n"
+            "• Prismatische Entwicklungen → Terastal Festival ex\n"
+            "• Paldeas Schicksale → Shiny Treasure ex\n"
+            "• Drachenwandel → Blue Sky Stream\n"
+            "• Schaurige Herrschaft → Eevee Heroes\n"
+            "• Zenit der Könige → VSTAR Universe\n"
+            "• Stürmische Funken → Paradise Dragona\n"
+            "• Ewige Rivalen → Battle Partners",
             parse_mode="HTML"
         )
         return

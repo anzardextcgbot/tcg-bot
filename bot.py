@@ -6,8 +6,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import re
 import asyncio
+import threading
+import hmac
+import hashlib
 from datetime import datetime
 from urllib.parse import urljoin
+from flask import Flask, request as flask_request
 
 from telegram import (
     Update,
@@ -23,6 +27,7 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler,
     JobQueue,
+    PreCheckoutQueryHandler,
 )
 
 import os
@@ -31,7 +36,11 @@ import os
 # CONFIG
 # ─────────────────────────────────────────
 BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
-PAYPAL_LINK      = os.getenv("PAYPAL_LINK", "https://paypal.me/deinname")  # Dein PayPal-Link
+STRIPE_TOKEN          = os.getenv("STRIPE_TOKEN", "")        # Telegram Payments Token von @BotFather
+STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")   # sk_live_... aus Stripe Dashboard
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "") # whsec_... aus Stripe Webhook
+MONTHLY_PRICE    = 699   # Preis in Cent = 6,99€
+CURRENCY         = "EUR"
 ADMIN_ID         = os.getenv("ADMIN_ID", "")          # Deine Telegram-ID für Admin-Befehle
 MONTHLY_PRICE    = 699                                 # Preis in Cent → 6,99 €
 
@@ -170,34 +179,93 @@ def require_sub(func):
 ALL_SETS: dict = {}
 SETS_LAST_LOADED: str = ""
 
+# Hardcoded Fallback-Sets (alle wichtigen Sets)
+FALLBACK_SETS = {
+    # Scarlet & Violet
+    "scarlet & violet": "sv1", "paldea evolved": "sv2", "obsidian flames": "sv3",
+    "scarlet & violet 151": "sv3pt5", "paradox rift": "sv4", "paldean fates": "sv4pt5",
+    "temporal forces": "sv5", "twilight masquerade": "sv6", "shrouded fable": "sv6pt5",
+    "stellar crown": "sv7", "surging sparks": "sv8", "journey together": "sv9",
+    "destined rivals": "sv9pt5",
+    # Sword & Shield
+    "sword & shield": "swsh1", "rebel clash": "swsh2", "darkness ablaze": "swsh3",
+    "vivid voltage": "swsh4", "battle styles": "swsh5", "chilling reign": "swsh6",
+    "evolving skies": "swsh7", "fusion strike": "swsh8", "brilliant stars": "swsh9",
+    "astral radiance": "swsh10", "lost origin": "swsh11", "silver tempest": "swsh12",
+    "crown zenith": "swsh12pt5",
+    # Sun & Moon
+    "sun & moon": "sm1", "guardians rising": "sm2", "burning shadows": "sm3",
+    "ultra prism": "sm5", "forbidden light": "sm6", "celestial storm": "sm7",
+    "lost thunder": "sm8", "team up": "sm9", "unbroken bonds": "sm10",
+    "unified minds": "sm11", "cosmic eclipse": "sm12",
+    # XY
+    "xy": "xy1", "flashfire": "xy2", "furious fists": "xy3", "phantom forces": "xy4",
+    "primal clash": "xy5", "roaring skies": "xy6", "ancient origins": "xy7",
+    "breakthrough": "xy8", "breakpoint": "xy9", "fates collide": "xy10",
+    "steam siege": "xy11", "evolutions": "xy12",
+    # Black & White
+    "black & white": "bw1", "emerging powers": "bw2", "noble victories": "bw3",
+    "next destinies": "bw4", "dark explorers": "bw5", "dragons exalted": "bw6",
+    "boundaries crossed": "bw7", "plasma storm": "bw8", "plasma freeze": "bw9",
+    "plasma blast": "bw10", "legendary treasures": "bw11",
+    # HeartGold SoulSilver
+    "heartgold & soulsilver": "hgss1", "unleashed": "hgss2",
+    "undaunted": "hgss3", "triumphant": "hgss4",
+    # Platinum
+    "platinum": "pl1", "rising rivals": "pl2", "supreme victors": "pl3", "arceus": "pl4",
+    # Diamond & Pearl
+    "diamond & pearl": "dp1", "mysterious treasures": "dp2", "secret wonders": "dp3",
+    "great encounters": "dp4", "majestic dawn": "dp5", "legends awakened": "dp6",
+    "stormfront": "dp7",
+    # Base
+    "base set": "base1", "jungle": "base2", "fossil": "base3",
+    "team rocket": "base4", "gym heroes": "gym1", "gym challenge": "gym2",
+    "neo genesis": "neo1", "neo discovery": "neo2", "neo revelation": "neo3",
+    "neo destiny": "neo4",
+}
+
 def load_all_sets() -> dict:
     global SETS_LAST_LOADED
+    # Erstmal Fallback laden
+    sets = dict(FALLBACK_SETS)
+    # Dann aus DB (falls schon gecacht)
     try:
-        response = requests.get(
-            "https://api.pokemontcg.io/v2/sets",
-            params={"pageSize": 500},
-            timeout=15
-        )
-        data = response.json()
-        sets = {}
-        for s in data.get("data", []):
-            name   = s.get("name", "").lower()
-            set_id = s.get("id", "")
-            sets[name] = set_id
-            # In DB speichern für zukünftige Offline-Nutzung
-            cursor.execute(
-                "INSERT OR REPLACE INTO known_sets (set_id, set_name, release_date) VALUES (?,?,?)",
-                (set_id, s.get("name",""), s.get("releaseDate",""))
-            )
-        conn.commit()
-        SETS_LAST_LOADED = datetime.now().strftime("%Y-%m-%d %H:%M")
-        print(f"✅ {len(sets)} Sets geladen ({SETS_LAST_LOADED})")
-        return sets
-    except Exception as e:
-        print(f"⚠️ Sets konnten nicht geladen werden: {e}")
-        # Fallback: aus DB
         cursor.execute("SELECT set_name, set_id FROM known_sets")
-        return {row[0].lower(): row[1] for row in cursor.fetchall()}
+        for row in cursor.fetchall():
+            sets[row[0].lower()] = row[1]
+    except Exception:
+        pass
+    # API versuchen
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                "https://api.pokemontcg.io/v2/sets",
+                params={"pageSize": 500},
+                timeout=30,
+                headers={"User-Agent": "AnzarDexBot/1.0"}
+            )
+            data = response.json()
+            for s in data.get("data", []):
+                name   = s.get("name", "").lower()
+                set_id = s.get("id", "")
+                sets[name] = set_id
+                try:
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO known_sets (set_id, set_name, release_date) VALUES (?,?,?)",
+                        (set_id, s.get("name",""), s.get("releaseDate",""))
+                    )
+                except Exception:
+                    pass
+            conn.commit()
+            SETS_LAST_LOADED = datetime.now().strftime("%Y-%m-%d %H:%M")
+            print(f"✅ {len(sets)} Sets geladen ({SETS_LAST_LOADED})")
+            return sets
+        except Exception as e:
+            print(f"⚠️ Sets Versuch {attempt+1}/3 fehlgeschlagen: {e}")
+            import time; time.sleep(2)
+    print(f"⚠️ Nutze Fallback mit {len(sets)} Sets")
+    SETS_LAST_LOADED = "Fallback"
+    return sets
 
 ALL_SETS = load_all_sets()
 
@@ -411,21 +479,18 @@ CARD_SEARCH_COUNT: dict = {}
 # ─────────────────────────────────────────
 def normalize_product_query(query: str) -> str:
     q = query.lower().strip()
-    replacements = {
-        "etb":            "elite trainer box",
-        "ttb":            "top trainer box",
-        "upc":            "ultra premium collection",
-        "booster bundle": "booster bundle",
-        "mini tin":       "mini tin",
-        "case":           "case",
-        "display":        "display",
-        "build & battle": "build and battle box",
-        "bab":            "build and battle box",
+    # Abkürzungen expandieren
+    abbrevs = {
+        "etb":   "elite trainer box",
+        "ttb":   "top trainer box",
+        "upc":   "ultra premium collection",
+        "bab":   "build and battle box",
     }
-    for short, full in replacements.items():
-        if short in q:
-            q = q.replace(short, full)
-    # DE → EN set-name mapping
+    for short, full in abbrevs.items():
+        # Nur als ganzes Wort ersetzen
+        import re as _re
+        q = _re.sub(rf"\b{short}\b", full, q)
+    # DE Set-Namen → EN (für API-Suche)
     for de_name, en_name in SET_ALIASES.items():
         if de_name in q:
             q = q.replace(de_name, en_name)
@@ -491,21 +556,82 @@ def check_restock(url: str):
     except Exception:
         return None
 
-def get_cardmarket_de_url(product_query: str) -> str:
-    encoded = product_query.replace(" ", "+")
-    return (
-        f"https://www.cardmarket.com/de/Pokemon/Products/Search"
-        f"?searchString={encoded}&sellerCountry=7&language=1,4"
-    )
+# EN → DE Übersetzung für Cardmarket-Suche (CM ist auf Deutsch)
+EN_TO_DE_SETS = {
+    "lost origin": "Verlorener Ursprung",
+    "silver tempest": "Silberne Sturmwinde",
+    "evolving skies": "Drachenwandel",
+    "fusion strike": "Fusionsangriff",
+    "brilliant stars": "Strahlende Sterne",
+    "chilling reign": "Schaurige Herrschaft",
+    "destined rivals": "Ewige Rivalen",
+    "surging sparks": "Stürmische Funken",
+    "stellar crown": "Stellarkrone",
+    "shrouded fable": "Verborgene Fabel",
+    "twilight masquerade": "Maskerade im Zwielicht",
+    "temporal forces": "Zeitliche Mächte",
+    "paldean fates": "Paldeas Schicksale",
+    "paradox rift": "Paradoxrift",
+    "scarlet & violet 151": "151",
+    "obsidian flames": "Obsidianflammen",
+    "paldea evolved": "Entwicklungen in Paldea",
+    "scarlet & violet": "Karmesin & Purpur",
+    "crown zenith": "Zenit der Könige",
+    "astral radiance": "Astralglanz",
+    "darkness ablaze": "Flammen der Finsternis",
+    "rebel clash": "Clash der Rebellen",
+    "sword & shield": "Schwert & Schild",
+    "vivid voltage": "Farbenschock",
+    "battle styles": "Kampfstile",
+    "journey together": "Reisegefährten",
+}
 
-def get_cardmarket_card_url(card_name: str, set_name: str = None) -> str:
-    query = card_name
-    if set_name:
-        query += f" {set_name}"
-    encoded = query.replace(" ", "+")
+PRODUCT_EN_TO_DE = {
+    "elite trainer box": "Top Trainer Box",
+    "etb": "Top Trainer Box",
+    "booster display": "Booster Display",
+    "display": "Booster Display",
+    "case": "Case",
+    "ultra premium collection": "Ultra Premium Collection",
+    "upc": "Ultra Premium Collection",
+    "booster bundle": "Booster Bundle",
+    "mini tin": "Mini Tin",
+    "tin": "Tin",
+    "collection box": "Kollektion",
+    "build and battle box": "Kampf-Akademie",
+}
+
+def get_cardmarket_de_url(product_query: str) -> str:
+    q = product_query.lower().strip()
+    # EN Set-Namen → DE übersetzen
+    for en, de in EN_TO_DE_SETS.items():
+        if en in q:
+            q = q.replace(en, de)
+    # Produkttypen → DE übersetzen
+    for en, de in PRODUCT_EN_TO_DE.items():
+        if en in q:
+            q = q.replace(en, de)
+    encoded = q.replace(" ", "%20")
     return (
         f"https://www.cardmarket.com/de/Pokemon/Products/Search"
         f"?searchString={encoded}&sellerCountry=7"
+    )
+
+def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = None) -> str:
+    # Set-Name auf Deutsch übersetzen für CM
+    de_set = set_name or ""
+    for en, de in EN_TO_DE_SETS.items():
+        if en.lower() in de_set.lower():
+            de_set = de
+            break
+    # Suchstring: Kartenname + DE Set-Name
+    q = card_name
+    if de_set:
+        q += f" {de_set}"
+    encoded = q.replace(" ", "%20")
+    return (
+        f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search"
+        f"?searchString={encoded}&sellerCountry=7&minCondition=2"
     )
 
 def find_product_link(search_url: str, query: str) -> str:
@@ -589,7 +715,7 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         keyboard = [
-            [InlineKeyboardButton("💳 Jetzt abonnieren – 4,99 €/Monat", callback_data="buy_sub")],
+            [InlineKeyboardButton("💳 Jetzt abonnieren – 6,99 €/Monat", callback_data="buy_sub")],
         ]
         await update.message.reply_text(
             "🔓 <b>AnzarDex Premium</b>\n\n"
@@ -601,29 +727,100 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Unbegrenzte Watchlist\n"
             "✅ Shop-Links bei Verfügbarkeit\n\n"
             "<b>Zahlung:</b> Kreditkarte, Debitkarte, Apple Pay, Google Pay, PayPal\n"
-            "(PayPal – schnelle manuelle Freischaltung)",
+            "(Kreditkarte, Debitkarte, Apple Pay, Google Pay)",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
 async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
+    query   = update.callback_query
     await query.answer()
-    user_id = str(query.from_user.id)
-    username = query.from_user.username or query.from_user.first_name or user_id
+    user_id  = str(query.from_user.id)
+    username = query.from_user.username or ""
 
-    text = (
-        f"💳 <b>AnzarDex Premium – 4,99 €/Monat</b>\n\n"
-        f"So abonnierst du:\n\n"
-        f"1️⃣ Sende <b>4,99 €</b> per PayPal an:\n"
-        f"👉 {PAYPAL_LINK}\n\n"
-        f"2️⃣ Schreibe in die PayPal-Notiz:\n"
-        f"<code>AnzarDex {user_id}</code>\n\n"
-        f"3️⃣ Schicke mir den Screenshot der Zahlung\n\n"
-        f"✅ Du wirst dann manuell freigeschaltet.\n"
-        f"<i>Normalerweise innerhalb weniger Minuten.</i>"
+    stripe_link = os.getenv("STRIPE_PAYMENT_LINK", "")
+
+    if stripe_link:
+        # Stripe Payment Link mit User-ID als Parameter
+        full_link = f"{stripe_link}?client_reference_id={user_id}&prefilled_email="
+        keyboard  = [[InlineKeyboardButton(
+            "💳 Jetzt abonnieren – 6,99 €/Monat",
+            url=full_link
+        )]]
+        await query.message.reply_text(
+            f"💳 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
+            f"✅ Kreditkarte, Debitkarte, Apple Pay, Google Pay\n"
+            f"✅ Automatische Freischaltung nach Zahlung\n"
+            f"✅ Jederzeit kündbar\n\n"
+            f"Tippe auf den Button und zahle sicher über Stripe:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await send_invoice(query.message, user_id)
+
+async def send_invoice(message, user_id: str):
+    if not STRIPE_TOKEN:
+        await message.reply_text(
+            "⚠️ Zahlungen noch nicht eingerichtet.\n"
+            "Bitte STRIPE_TOKEN in Railway eintragen."
+        )
+        return
+    await message.reply_invoice(
+        title="AnzarDex TCG Premium",
+        description=(
+            "1 Monat Premium:\n"
+            "• Restock-Alerts für alle Produkte\n"
+            "• Preisalarme für alle Karten\n"
+            "• Alle Sets EN/DE/JP\n"
+            "• Günstigster Cardmarket-Preis DE"
+        ),
+        payload=f"sub_{user_id}",
+        provider_token=STRIPE_TOKEN,
+        currency=CURRENCY,
+        prices=[LabeledPrice("AnzarDex Premium – 1 Monat", MONTHLY_PRICE)],
+        need_name=False,
+        need_email=False,
+        is_flexible=False,
     )
-    await query.message.reply_text(text, parse_mode="HTML")
+
+async def precheckout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.pre_checkout_query.answer(ok=True)
+
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id   = str(update.effective_user.id)
+    username  = update.effective_user.username or ""
+    charge_id = update.message.successful_payment.telegram_payment_charge_id
+    now       = datetime.now()
+    if now.month == 12:
+        expires = now.replace(year=now.year + 1, month=1)
+    else:
+        expires = now.replace(month=now.month + 1)
+
+    cursor.execute(
+        """
+        INSERT INTO subscriptions
+            (user_id, username, status, plan, started_at, expires_at, telegram_payment_charge_id)
+        VALUES (?,?,'active','monthly',?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            status='active',
+            started_at=excluded.started_at,
+            expires_at=excluded.expires_at,
+            telegram_payment_charge_id=excluded.telegram_payment_charge_id
+        """,
+        (user_id, username, now.isoformat(), expires.isoformat(), charge_id)
+    )
+    conn.commit()
+
+    await update.message.reply_text(
+        "🎉 <b>Zahlung erfolgreich! Willkommen bei AnzarDex Premium!</b>\n\n"
+        "✅ Restock-Alerts aktiv\n"
+        "✅ Preisalarme aktiv\n"
+        "✅ Alle Sets EN/DE/JP\n\n"
+        f"Gültig bis: <b>{expires.strftime('%d.%m.%Y')}</b>\n\n"
+        "Tippe /start um loszulegen!",
+        parse_mode="HTML",
+    )
 
 async def cancel_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -708,12 +905,8 @@ async def send_card_details(message, card):
     low   = prices.get("lowPrice")
     avg   = prices.get("averageSellPrice")
 
-    # Cardmarket DE – gefiltert auf deutsche Verkäufer
-    cm_url = (
-        "https://www.cardmarket.com/de/Pokemon/Products/Search"
-        f"?searchString={name.replace(' ', '+')}+{set_nm.replace(' ', '+')}"
-        "&sellerCountry=7"
-    )
+    # Cardmarket DE – direkt zur richtigen Karte
+    cm_url = get_cardmarket_card_url(name, set_nm, number)
 
     preis_zeilen = []
     if low:
@@ -766,51 +959,71 @@ async def _search_card(message, query: str):
         if de in query_lower:
             query_lower = query_lower.replace(de, en)
 
+    # Set erkennen
     matched_set = None
     best_match  = ""
     for set_name in ALL_SETS.keys():
         if set_name in query_lower and len(set_name) > len(best_match):
             best_match = set_name
 
-    if "151" in query_lower:
+    if "151" in query_lower and "set" not in query_lower:
         matched_set = "scarlet & violet 151"
     elif best_match:
         matched_set = best_match
 
-    search_words   = query_lower.split()
+    # Kartenname extrahieren (Set-Wörter rausfiltern)
+    set_words = set(matched_set.split()) if matched_set else set()
     card_name_words = []
-    for word in search_words:
-        if matched_set and word in matched_set:
-            break
-        if word == "151":
-            break
+    for word in query_lower.split():
+        if word in set_words or word == "151":
+            continue
         card_name_words.append(word)
 
-    card_name = " ".join(card_name_words)
-    cards     = search_pokemon_card(card_name, matched_set)
+    card_name = " ".join(card_name_words).strip()
+    if not card_name:
+        card_name = query_lower
 
-    # Scoring
+    cards = search_pokemon_card(card_name, matched_set)
+
+    # Scoring – JP-Karten nach unten, EN bevorzugen, richtiges Set stark bevorzugen
     scored = []
     for card in cards:
-        card_text = (
-            f"{card.get('name','')} "
-            f"{card.get('set',{}).get('name','')} "
-            f"{card.get('number','')}"
-        ).lower()
-        score = 0
-        if card.get("name","").lower() == card_name.lower():
+        set_obj  = card.get("set", {})
+        set_name = set_obj.get("name", "").lower()
+        set_id   = set_obj.get("id", "").lower()
+        c_name   = card.get("name", "").lower()
+        number   = card.get("number", "")
+        score    = 0
+
+        # Exakter Kartenname
+        if c_name == card_name.lower():
+            score += 20
+        elif card_name.lower() in c_name:
             score += 10
-        for word in search_words:
-            if word in card_text:
-                score += 1
-            if matched_set and matched_set in card.get("set",{}).get("name","").lower():
-                score += 10
+
+        # Richtiges Set
+        if matched_set and matched_set.lower() in set_name:
+            score += 30
+
+        # JP-Karten stark benachteiligen
+        jp_indicators = ["jp", "japanese", "japan", "sv", "s12"]
+        lang = card.get("language", "").lower()
+        if lang == "ja" or any(j in set_id for j in ["jp", "jap"]):
+            score -= 50
+
+        # Nummer ist rein numerisch → EN-Karte wahrscheinlicher
+        if number.isdigit():
+            score += 5
+
         scored.append((score, card))
 
     scored.sort(reverse=True, key=lambda x: x[0])
-    cards = [c for _, c in scored[:5]]
+    # Nur Karten mit positivem Score oder die besten 5
+    cards = [c for _, c in scored[:5] if _ > -10]
+    if not cards:
+        cards = [c for _, c in scored[:5]]
 
-    user_id = str(message.from_user.id) if hasattr(message, 'from_user') else "0"
+    user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
     last_search_results[user_id] = cards
 
     if not cards:
@@ -822,10 +1035,12 @@ async def _search_card(message, query: str):
 
     keyboard = []
     for idx, card in enumerate(cards, 1):
-        prices   = card.get("cardmarket", {}).get("prices", {})
-        trend    = prices.get("trendPrice", "?")
+        prices = card.get("cardmarket", {}).get("prices", {})
+        trend  = prices.get("trendPrice", "?")
+        set_nm = card.get("set", {}).get("name", "?")
+        num    = card.get("number", "?")
         keyboard.append([InlineKeyboardButton(
-            f"{idx}. {card.get('name')} | {card.get('set',{}).get('name','?')} | #{card.get('number','?')} | {trend}€",
+            f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
             callback_data=f"select_{idx}"
         )])
 
@@ -915,8 +1130,13 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_command(update, context)
         return
 
-    # Produkt-Erkennung
-    is_product = any(kw in text_lower for kw in PRODUCT_KEYWORDS)
+    # Produkt-Erkennung (EN + DE Keywords)
+    DE_PRODUCT_KEYWORDS = [
+        "booster display", "top trainer box", "trainer box",
+        "ultra premium", "kollektion", "display", "tin", "case",
+        "elite trainer", "bundle", "booster"
+    ]
+    is_product = any(kw in text_lower for kw in PRODUCT_KEYWORDS + DE_PRODUCT_KEYWORDS)
     context.args = text.split()
 
     if is_product:
@@ -1591,8 +1811,138 @@ async def admin_removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────
+# ─────────────────────────────────────────
+# FLASK WEBHOOK – Stripe Zahlungen
+# ─────────────────────────────────────────
+flask_app = Flask(__name__)
+telegram_app_ref = None  # wird in main() gesetzt
+
+def activate_subscription(user_id: str, username: str = ""):
+    """Abo in DB aktivieren und User benachrichtigen."""
+    now = datetime.now()
+    if now.month == 12:
+        expires = now.replace(year=now.year + 1, month=1)
+    else:
+        expires = now.replace(month=now.month + 1)
+
+    cursor.execute(
+        """
+        INSERT INTO subscriptions
+            (user_id, username, status, plan, started_at, expires_at)
+        VALUES (?,?,'active','monthly',?,?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            status='active',
+            started_at=excluded.started_at,
+            expires_at=excluded.expires_at
+        """,
+        (user_id, username, now.isoformat(), expires.isoformat())
+    )
+    conn.commit()
+    print(f"✅ Abo aktiviert für User {user_id} bis {expires.strftime('%d.%m.%Y')}")
+
+    # Telegram-Nachricht senden
+    if telegram_app_ref:
+        async def send_msg():
+            try:
+                await telegram_app_ref.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        "🎉 <b>Zahlung bestätigt! Willkommen bei AnzarDex Premium!</b>\n\n"
+                        "✅ Restock-Alerts aktiv\n"
+                        "✅ Preisalarme aktiv\n"
+                        "✅ Alle Sets EN/DE/JP\n\n"
+                        f"Gültig bis: <b>{expires.strftime('%d.%m.%Y')}</b>\n\n"
+                        "Tippe /start um loszulegen! 🚀"
+                    ),
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                print(f"⚠️ Telegram-Nachricht fehlgeschlagen: {e}")
+        asyncio.run_coroutine_threadsafe(send_msg(), telegram_app_ref.update_queue._loop)
+
+def deactivate_subscription(user_id: str):
+    """Abo deaktivieren (z.B. bei Kündigung oder fehlgeschlagener Zahlung)."""
+    cursor.execute(
+        "UPDATE subscriptions SET status='cancelled' WHERE user_id=?",
+        (user_id,)
+    )
+    conn.commit()
+    print(f"❌ Abo deaktiviert für User {user_id}")
+
+@flask_app.route("/webhook", methods=["POST"])
+def stripe_webhook():
+    payload    = flask_request.get_data()
+    sig_header = flask_request.headers.get("Stripe-Signature", "")
+
+    # Webhook-Signatur prüfen
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            # Stripe Signatur manuell verifizieren
+            parts = {k: v for k, v in (p.split("=", 1) for p in sig_header.split(","))}
+            timestamp = parts.get("t", "")
+            signature = parts.get("v1", "")
+            signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
+            expected = hmac.new(
+                STRIPE_WEBHOOK_SECRET.encode(),
+                signed_payload.encode(),
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(expected, signature):
+                print("⚠️ Ungültige Webhook-Signatur")
+                return "", 400
+        except Exception as e:
+            print(f"⚠️ Signatur-Fehler: {e}")
+            return "", 400
+
+    try:
+        event = json.loads(payload)
+    except Exception:
+        return "", 400
+
+    event_type = event.get("type", "")
+    data_obj   = event.get("data", {}).get("object", {})
+
+    print(f"📨 Stripe Event: {event_type}")
+
+    # Erfolgreiche Zahlung / Abo gestartet
+    if event_type in ("checkout.session.completed", "invoice.payment_succeeded", "customer.subscription.created"):
+        # User-ID aus Metadata lesen (wird beim Checkout-Link gesetzt)
+        metadata  = data_obj.get("metadata", {})
+        user_id   = metadata.get("telegram_user_id", "")
+        username  = metadata.get("telegram_username", "")
+
+        # Alternativ aus client_reference_id (bei Checkout Sessions)
+        if not user_id:
+            user_id = data_obj.get("client_reference_id", "")
+
+        if user_id:
+            activate_subscription(user_id, username)
+        else:
+            print(f"⚠️ Kein telegram_user_id in Stripe Metadata: {metadata}")
+
+    # Kündigung / fehlgeschlagene Zahlung
+    elif event_type in ("customer.subscription.deleted", "invoice.payment_failed"):
+        metadata = data_obj.get("metadata", {})
+        user_id  = metadata.get("telegram_user_id", "")
+        if user_id:
+            deactivate_subscription(user_id)
+
+    return "", 200
+
+@flask_app.route("/health", methods=["GET"])
+def health():
+    return "AnzarDex Bot läuft ✅", 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8000))
+    print(f"🌐 Flask Webhook läuft auf Port {port}")
+    flask_app.run(host="0.0.0.0", port=port, debug=False)
+
 def main():
+    global telegram_app_ref
     app = Application.builder().token(BOT_TOKEN).build()
+    telegram_app_ref = app
+    jq  = app.job_queue
     jq  = app.job_queue
 
     # Jobs
@@ -1629,11 +1979,18 @@ def main():
 
     # Payments
 
+    app.add_handler(PreCheckoutQueryHandler(precheckout))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+
     # Callbacks (zentraler Dispatcher)
     app.add_handler(CallbackQueryHandler(callback_dispatcher))
 
     # Text-Eingabe
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+
+    # Flask Webhook in separatem Thread starten
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
 
     print("🚀 AnzarDex TCG Bot läuft...")
     app.run_polling()

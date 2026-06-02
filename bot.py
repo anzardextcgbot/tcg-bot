@@ -14,7 +14,6 @@ from telegram import (
     ReplyKeyboardMarkup,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    LabeledPrice,
 )
 from telegram.ext import (
     Application,
@@ -24,7 +23,6 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler,
     JobQueue,
-    PreCheckoutQueryHandler,
 )
 
 import os
@@ -33,10 +31,9 @@ import os
 # CONFIG
 # ─────────────────────────────────────────
 BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
-STRIPE_TOKEN     = os.getenv("STRIPE_TOKEN", "")     # Telegram Payments Provider Token (Stripe)
+PAYPAL_LINK      = os.getenv("PAYPAL_LINK", "https://paypal.me/deinname")  # Dein PayPal-Link
 ADMIN_ID         = os.getenv("ADMIN_ID", "")          # Deine Telegram-ID für Admin-Befehle
-MONTHLY_PRICE    = 499                                 # Preis in Cent → 4,99 €
-CURRENCY         = "EUR"
+MONTHLY_PRICE    = 699                                 # Preis in Cent → 6,99 €
 
 last_search_results = {}
 
@@ -604,7 +601,7 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Unbegrenzte Watchlist\n"
             "✅ Shop-Links bei Verfügbarkeit\n\n"
             "<b>Zahlung:</b> Kreditkarte, Debitkarte, Apple Pay, Google Pay, PayPal\n"
-            "(über Telegram Payments / Stripe)",
+            "(PayPal – schnelle manuelle Freischaltung)",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
@@ -612,70 +609,21 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await send_invoice(query.message, str(query.from_user.id))
+    user_id = str(query.from_user.id)
+    username = query.from_user.username or query.from_user.first_name or user_id
 
-async def send_invoice(message, user_id: str):
-    if not STRIPE_TOKEN:
-        await message.reply_text(
-            "⚠️ Zahlungen sind noch nicht konfiguriert.\n"
-            "Bitte kontaktiere den Bot-Betreiber."
-        )
-        return
-    await message.reply_invoice(
-        title="AnzarDex TCG Premium",
-        description=(
-            "1 Monat Premium-Zugang:\n"
-            "• Restock-Alerts für alle Produkte\n"
-            "• Preisalarme für alle Karten\n"
-            "• Alle Sets EN/DE/JP\n"
-            "• Günstigster Cardmarket-Preis DE"
-        ),
-        payload=f"sub_{user_id}",
-        provider_token=STRIPE_TOKEN,
-        currency=CURRENCY,
-        prices=[LabeledPrice("AnzarDex Premium – 1 Monat", MONTHLY_PRICE)],
-        need_name=False,
-        need_email=False,
-        is_flexible=False,
+    text = (
+        f"💳 <b>AnzarDex Premium – 4,99 €/Monat</b>\n\n"
+        f"So abonnierst du:\n\n"
+        f"1️⃣ Sende <b>4,99 €</b> per PayPal an:\n"
+        f"👉 {PAYPAL_LINK}\n\n"
+        f"2️⃣ Schreibe in die PayPal-Notiz:\n"
+        f"<code>AnzarDex {user_id}</code>\n\n"
+        f"3️⃣ Schicke mir den Screenshot der Zahlung\n\n"
+        f"✅ Du wirst dann manuell freigeschaltet.\n"
+        f"<i>Normalerweise innerhalb weniger Minuten.</i>"
     )
-
-async def precheckout(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.pre_checkout_query
-    await query.answer(ok=True)
-
-async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id    = str(update.effective_user.id)
-    username   = update.effective_user.username or ""
-    charge_id  = update.message.successful_payment.telegram_payment_charge_id
-    now        = datetime.now()
-    expires    = now.replace(month=now.month % 12 + 1) if now.month < 12 else now.replace(year=now.year+1, month=1)
-
-    cursor.execute(
-        """
-        INSERT INTO subscriptions
-            (user_id, username, status, plan, started_at, expires_at, telegram_payment_charge_id)
-        VALUES (?,?,?,?,?,?,?)
-        ON CONFLICT(user_id) DO UPDATE SET
-            status=excluded.status,
-            started_at=excluded.started_at,
-            expires_at=excluded.expires_at,
-            telegram_payment_charge_id=excluded.telegram_payment_charge_id
-        """,
-        (user_id, username, "active", "monthly",
-         now.isoformat(), expires.isoformat(), charge_id)
-    )
-    conn.commit()
-
-    await update.message.reply_text(
-        "🎉 <b>Zahlung erfolgreich! Willkommen bei AnzarDex Premium!</b>\n\n"
-        "Du hast jetzt Zugriff auf alle Funktionen:\n"
-        "🔔 Restock-Alerts aktiviert\n"
-        "📈 Preisalarme aktiviert\n"
-        "🌍 Alle Sets EN/DE/JP verfügbar\n\n"
-        f"Gültig bis: <b>{expires.strftime('%d.%m.%Y')}</b>\n\n"
-        "Tippe /start um loszulegen!",
-        parse_mode="HTML",
-    )
+    await query.message.reply_text(text, parse_mode="HTML")
 
 async def cancel_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1108,9 +1056,12 @@ async def remove_card_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    cards = context.user_data.get("last_cards", [])
+    user_id = str(query.from_user.id)
+
+    # Aus globalem Cache lesen
+    cards = last_search_results.get(user_id, [])
     if not cards:
-        await query.message.reply_text("Bitte suche zuerst eine Karte.")
+        await query.message.reply_text("❌ Bitte suche zuerst eine Karte, z.B.: charizard 151")
         return
     try:
         choice = int(query.data.replace("select_", ""))
@@ -1567,6 +1518,56 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID:
         return
+
+async def admin_adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: /adduser TELEGRAM_ID  →  schaltet User frei"""
+    if str(update.effective_user.id) != ADMIN_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Benutze: /adduser 123456789")
+        return
+    target_id = context.args[0]
+    now     = datetime.now()
+    expires = now.replace(month=now.month % 12 + 1) if now.month < 12 else now.replace(year=now.year+1, month=1)
+    cursor.execute(
+        """
+        INSERT INTO subscriptions (user_id, username, status, plan, started_at, expires_at)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            status='active', started_at=excluded.started_at, expires_at=excluded.expires_at
+        """,
+        (target_id, "", "active", "monthly", now.isoformat(), expires.isoformat())
+    )
+    conn.commit()
+    await update.message.reply_text(f"✅ User {target_id} freigeschaltet bis {expires.strftime('%d.%m.%Y')}")
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=(
+                "🎉 <b>Willkommen bei AnzarDex Premium!</b>\n\n"
+                "Dein Abo wurde aktiviert.\n"
+                "✅ Restock-Alerts aktiv\n"
+                "✅ Preisalarme aktiv\n"
+                "✅ Alle Sets EN/DE/JP\n\n"
+                f"Gültig bis: <b>{expires.strftime('%d.%m.%Y')}</b>\n\n"
+                "Tippe /start um loszulegen!"
+            ),
+            parse_mode="HTML"
+        )
+    except Exception:
+        pass
+
+async def admin_removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: /removeuser TELEGRAM_ID  →  deaktiviert User"""
+    if str(update.effective_user.id) != ADMIN_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Benutze: /removeuser 123456789")
+        return
+    target_id = context.args[0]
+    cursor.execute("UPDATE subscriptions SET status='cancelled' WHERE user_id=?", (target_id,))
+    conn.commit()
+    await update.message.reply_text(f"❌ User {target_id} deaktiviert")
     cursor.execute("SELECT COUNT(*) FROM subscriptions WHERE status='active'")
     active = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM subscriptions")
@@ -1623,10 +1624,10 @@ def main():
     app.add_handler(CommandHandler("unfavset",     unfavset))
     app.add_handler(CommandHandler("help",         help_command))
     app.add_handler(CommandHandler("admin",        admin_stats))
+    app.add_handler(CommandHandler("adduser",      admin_adduser))
+    app.add_handler(CommandHandler("removeuser",   admin_removeuser))
 
     # Payments
-    app.add_handler(PreCheckoutQueryHandler(precheckout))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
     # Callbacks (zentraler Dispatcher)
     app.add_handler(CallbackQueryHandler(callback_dispatcher))

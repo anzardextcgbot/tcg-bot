@@ -1042,6 +1042,7 @@ async def _search_card(message, query: str):
         cards = [c for _, c in scored[:5]]
 
     user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
+    # Karten speichern – Key mit user_id damit parallele Suchen sich nicht überschreiben
     last_search_results[user_id] = cards
 
     if not cards:
@@ -1057,9 +1058,11 @@ async def _search_card(message, query: str):
         trend  = prices.get("trendPrice", "?")
         set_nm = card.get("set", {}).get("name", "?")
         num    = card.get("number", "?")
+        # User-ID im callback_data damit button_select immer den richtigen Cache trifft
+        callback = f"sel_{user_id}_{idx}"
         keyboard.append([InlineKeyboardButton(
             f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
-            callback_data=f"select_{idx}"
+            callback_data=callback
         )])
 
     await message.reply_text(
@@ -1296,18 +1299,36 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = str(query.from_user.id)
+    data    = query.data  # Format: "sel_USERID_IDX"
 
-    # Aus globalem Cache lesen
-    cards = last_search_results.get(user_id, [])
-    if not cards:
-        await query.message.reply_text("❌ Bitte suche zuerst eine Karte, z.B.: charizard 151")
-        return
     try:
-        choice = int(query.data.replace("select_", ""))
+        # Neues Format: sel_USERID_IDX
+        if data.startswith("sel_"):
+            parts  = data.split("_")
+            # parts = ["sel", user_id_part1, ..., idx]
+            choice = int(parts[-1])
+            cache_id = "_".join(parts[1:-1])
+        else:
+            # Altes Format: select_IDX
+            choice   = int(data.replace("select_", ""))
+            cache_id = user_id
     except Exception:
+        await query.message.reply_text("❌ Fehler beim Laden der Karte.")
         return
+
+    cards = last_search_results.get(cache_id, [])
+    if not cards:
+        # Fallback: eigene user_id versuchen
+        cards = last_search_results.get(user_id, [])
+
+    if not cards:
+        await query.message.reply_text("❌ Bitte suche die Karte nochmal.")
+        return
+
     if choice < 1 or choice > len(cards):
+        await query.message.reply_text("❌ Ungültige Auswahl.")
         return
+
     await send_card_details(query.message, cards[choice - 1])
 
 async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1725,7 +1746,9 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     data  = query.data
 
-    if data == "buy_sub":
+    if data.startswith("sel_") or data.startswith("select_"):
+        await button_select(update, context)
+    elif data == "buy_sub":
         await buy_sub_button(update, context)
     elif data == "cancel_sub":
         await cancel_sub_button(update, context)

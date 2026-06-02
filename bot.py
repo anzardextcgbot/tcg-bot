@@ -1004,14 +1004,18 @@ async def send_card_details(message, card):
     low   = prices.get("lowPrice")
     avg   = prices.get("averageSellPrice")
 
-    # Direkter Cardmarket Link aus der API – geht DIREKT zur richtigen Karte
+    # Cardmarket URL – direkt aus API, sauber validiert
     cm_url = cm_data.get("url", "")
     if cm_url:
         if not cm_url.startswith("http"):
             cm_url = "https://www.cardmarket.com" + cm_url
-    else:
-        # Fallback: Suchanfrage ohne DE-Filter
-        cm_url = get_cardmarket_card_url(name, set_nm, number if number.isdigit() else None)
+        # Sicherstellen dass URL gültig ist
+        if " " in cm_url or not cm_url.startswith("https://"):
+            cm_url = ""
+    if not cm_url:
+        # Fallback: einfache Suche
+        q = f"{name} {set_nm}".replace(" ", "%20")
+        cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
 
     preis_zeilen = []
     if low:
@@ -1029,16 +1033,8 @@ async def send_card_details(message, card):
         + "\n".join(preis_zeilen)
     )
 
-    # callback_data max 64 Bytes – nur Kartenname kürzen
-    safe_name   = name[:28].strip()
-    track_cb    = f"tc_{safe_name}"    # max ~35 Bytes
-    untrack_cb  = f"utc_{safe_name}"   # max ~35 Bytes
-
+    # Nur Cardmarket Button für Einzelkarten (kein Beobachten/Entfernen hier)
     keyboard = [
-        [
-            InlineKeyboardButton("⭐ Beobachten", callback_data=track_cb),
-            InlineKeyboardButton("❌ Entfernen",  callback_data=untrack_cb),
-        ],
         [InlineKeyboardButton("🛒 Direkt auf Cardmarket", url=cm_url)],
     ]
 
@@ -1096,7 +1092,7 @@ async def _search_card(message, query: str):
 
     cards = search_pokemon_card(card_name, matched_set)
 
-    # Scoring – JP-Karten nach unten, EN bevorzugen, richtiges Set stark bevorzugen
+    # Scoring – richtiges Set bevorzugen, JP-Karten raus
     scored = []
     for card in cards:
         set_obj  = card.get("set", {})
@@ -1106,46 +1102,56 @@ async def _search_card(message, query: str):
         number   = card.get("number", "")
         score    = 0
 
-        # Exakter Kartenname
+        # Kartenname stimmt überein
         if c_name == card_name.lower():
             score += 20
         elif card_name.lower() in c_name:
             score += 10
 
-        # Richtiges Set
+        # Richtiges Set – starker Bonus
         if matched_set and matched_set.lower() in set_name:
-            score += 30
+            score += 50
 
-        # JP-Karten stark benachteiligen
-        jp_indicators = ["jp", "japanese", "japan", "sv", "s12"]
+        # JP-Karten komplett ausschließen (set_id endet auf pt/kor/jp etc.)
         lang = card.get("language", "").lower()
-        if lang == "ja" or any(j in set_id for j in ["jp", "jap"]):
-            score -= 50
+        is_jp = (
+            lang == "ja" or
+            any(set_id.startswith(p) for p in ["sm", "xy", "dp", "ex", "neo", "base"]) is False and
+            any(j in set_id for j in ["-jp", "jp-", "kor", "pt-"])
+        )
+        if is_jp:
+            continue  # JP-Karte komplett überspringen
 
-        # Nummer ist rein numerisch → EN-Karte wahrscheinlicher
+        # Numerische Nummer = EN-Karte
         if number.isdigit():
-            score += 5
+            score += 3
+
+        # Promo-Karten weniger bevorzugen wenn Set gefunden
+        if matched_set and "promo" in set_name and matched_set not in set_name:
+            score -= 20
 
         scored.append((score, card))
 
     scored.sort(reverse=True, key=lambda x: x[0])
-    # Nur Karten mit positivem Score oder die besten 5
-    cards = [c for _, c in scored[:5] if _ > -10]
+    # Alle mit positivem Score, max 8
+    cards = [c for _, c in scored[:8] if _ >= 0]
     if not cards:
-        cards = [c for _, c in scored[:5]]
+        cards = [c for _, c in scored[:8]]
 
     user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
-    # RAM Cache
+    # RAM + DB Cache speichern – DB überlebt Bot-Neustarts
     last_search_results[user_id] = cards
-    # DB Cache – überlebt Bot-Neustarts
-    now = datetime.now().isoformat()
-    cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
-    for pos, card in enumerate(cards, 1):
-        cursor.execute(
-            "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
-            (user_id, pos, json.dumps(card), now)
-        )
-    conn.commit()
+    try:
+        now = datetime.now().isoformat()
+        cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
+        for pos, card in enumerate(cards, 1):
+            cursor.execute(
+                "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
+                (user_id, pos, json.dumps(card, ensure_ascii=False), now)
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Cache-Fehler: {e}")
 
     if not cards:
         await message.reply_text("❌ Keine Karte gefunden.")
@@ -1418,22 +1424,25 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Fehler beim Laden der Karte.")
         return
 
-    cards = last_search_results.get(cache_id, [])
+    # Immer erst aus DB laden – überlebt Bot-Neustarts zuverlässig
+    cursor.execute(
+        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC",
+        (user_id,)
+    )
+    rows  = cursor.fetchall()
+    cards = [json.loads(r[0]) for r in rows] if rows else []
+
+    # RAM als Backup
     if not cards:
         cards = last_search_results.get(user_id, [])
-    # Fallback: aus DB laden (überlebt Neustarts)
-    if not cards:
-        cursor.execute(
-            "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC",
-            (user_id,)
-        )
-        rows = cursor.fetchall()
-        if rows:
-            cards = [json.loads(r[0]) for r in rows]
-            last_search_results[user_id] = cards
+        if not cards:
+            cards = last_search_results.get(cache_id, [])
 
     if not cards:
-        await query.message.reply_text("❌ Bitte suche die Karte nochmal neu.")
+        await query.message.reply_text(
+            "❌ Bitte such die Karte nochmal — tippe z.B. *umbreon evolving skies*",
+            parse_mode="Markdown"
+        )
         return
 
     if choice < 1 or choice > len(cards):

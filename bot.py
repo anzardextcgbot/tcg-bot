@@ -119,6 +119,13 @@ def init_db():
             language TEXT DEFAULT 'en',
             release_date TEXT
         );
+        CREATE TABLE IF NOT EXISTS card_search_cache (
+            user_id   TEXT,
+            position  INTEGER,
+            card_json TEXT,
+            created_at TEXT,
+            PRIMARY KEY (user_id, position)
+        );
     """)
     conn.commit()
 
@@ -443,32 +450,64 @@ PRODUCT_KEYWORDS = list(PRODUCT_TYPES.keys()) + [
 # ─────────────────────────────────────────
 # SHOPS – Suchmuster + Direktlinks
 # ─────────────────────────────────────────
+# Shop-Suchmuster: {query} wird durch den Produktnamen ersetzt
 SHOP_SEARCH_PATTERNS = {
-    "Gate to the Games":  "https://www.gate-to-the-games.de/search?sSearch={query}",
-    "Cardbuddys":         "https://cardbuddys.de/search?search={query}",
-    "Games Island":       "https://games-island.eu/search?sSearch={query}",
-    "Trader Online":      "https://www.trader-online.de/search?sSearch={query}",
-    "TCG-Corner":         "https://www.tcg-corner.de/search?q={query}",
-    "Pokeviert":          "https://pokeviert.de/?s={query}",
-    "Cardicuno":          "https://cardicuno.de/search?q={query}",
-    "Collect-It":         "https://collect-it.de/search?q={query}",
-    "Kofuku":             "https://kofuku.de/?s={query}",
-    "Amazon DE":          "https://www.amazon.de/s?k={query}+pokemon",
-    "eBay DE":            "https://www.ebay.de/sch/i.html?_nkw={query}+pokemon",
-    "Smyths":             "https://www.smythstoys.com/de/de-de/search/?text={query}",
-    "Müller":             "https://www.mueller.de/search/?query={query}",
-    "GameStop":           "https://www.gamestop.de/SearchResult/QuickSearch?q={query}",
-    "MediaMarkt":         "https://www.mediamarkt.de/de/search.html?query={query}",
-    "Saturn":             "https://www.saturn.de/de/search.html?query={query}",
-    "OTTO":               "https://www.otto.de/suche/{query}/",
-    "Kaufland":           "https://www.kaufland.de/s/?search_value={query}",
-    "Thalia":             "https://www.thalia.de/suche?sq={query}",
-    # JP-Shops
-    "Plaza Japan":        "https://www.plazajapan.com/search-results/?q={query}",
-    "Meccha Japan":       "https://meccha-japan.com/en/search?controller=search&s={query}",
-    "Japan2UK":           "https://www.japan2uk.com/search?q={query}",
-    "Chaos Cards":        "https://www.chaoscards.co.uk/search/{query}",
+    # ── Deutsche TCG-Shops ─────────────────────────────────────────
+    "Gate to the Games":    "https://www.gate-to-the-games.de/search?sSearch={query}",
+    "Cardbuddys":           "https://cardbuddys.de/search?search={query}",
+    "Games Island":         "https://games-island.eu/search?sSearch={query}",
+    "Trader Online":        "https://www.trader-online.de/search?sSearch={query}",
+    "TCG-Corner":           "https://www.tcg-corner.de/search?q={query}",
+    "Pokeviert":            "https://pokeviert.de/?s={query}",
+    "Cardicuno":            "https://cardicuno.de/search?q={query}",
+    "Collect-It":           "https://collect-it.de/search?q={query}",
+    "Kofuku":               "https://kofuku.de/?s={query}",
+    "Legendary Cards":      "https://legendary-cards.de/search?q={query}",
+    "Helden der Freizeit":  "https://www.helden-der-freizeit.de/search?q={query}",
+    "bigpanda":             "https://www.bigpanda.de/search?query={query}",
+    "Fantasywelt":          "https://www.fantasywelt.de/search?sSearch={query}",
+    "Spiele-Offensive":     "https://www.spiele-offensive.de/search?q={query}",
+    "Cardgame Corner":      "https://cardgamecorner.de/search?type=product&q={query}",
+    "Poke-Corner":          "https://www.poke-corner.de/search?q={query}",
+    "Mythic Games":         "https://mythicgames.de/search?q={query}",
+    "Lucky Card Shop":      "https://luckycardshop.de/search?q={query}",
+    # ── Große DE Händler ───────────────────────────────────────────
+    "Amazon DE":            "https://www.amazon.de/s?k={query}+pokemon",
+    "eBay DE":              "https://www.ebay.de/sch/i.html?_nkw={query}+pokemon",
+    "Smyths":               "https://www.smythstoys.com/de/de-de/search/?text={query}",
+    "Müller":               "https://www.mueller.de/search/?query={query}",
+    "GameStop DE":          "https://www.gamestop.de/SearchResult/QuickSearch?q={query}",
+    "MediaMarkt":           "https://www.mediamarkt.de/de/search.html?query={query}",
+    "Saturn":               "https://www.saturn.de/de/search.html?query={query}",
+    "OTTO":                 "https://www.otto.de/suche/{query}/",
+    "Kaufland":             "https://www.kaufland.de/s/?search_value={query}",
+    "Thalia":               "https://www.thalia.de/suche?sq={query}",
+    "Rossmann":             "https://www.rossmann.de/de/search?text={query}",
+    "dm":                   "https://www.dm.de/search?query={query}",
+    # ── UK / Internationale TCG-Shops ─────────────────────────────
+    "Chaos Cards (UK)":     "https://www.chaoscards.co.uk/search?q={query}",
+    "Pokémon Center UK":    "https://www.pokemoncenter.com/search?q={query}",
+    "Total Cards (UK)":     "https://www.totalcards.net/search?q={query}",
+    "Ludkins (UK)":         "https://www.ludkins.co.uk/search?type=product&q={query}",
+    "Magic Madhouse (UK)":  "https://www.magicmadhouse.co.uk/search?q={query}",
+    "Zatu Games (UK)":      "https://www.zatugames.com/search?q={query}",
+    "Card Merchant (UK)":   "https://www.cardmerchant.co.uk/search?type=product&q={query}",
+    # ── JP-Shops ───────────────────────────────────────────────────
+    "Plaza Japan":          "https://www.plazajapan.com/search-results/?q={query}",
+    "Meccha Japan":         "https://meccha-japan.com/en/search?controller=search&s={query}",
+    "Japan2UK":             "https://www.japan2uk.com/search?q={query}",
+    "AmiAmi":               "https://www.amiami.com/eng/search/list/?s_keywords={query}",
+    "HLJ":                  "https://www.hlj.com/search/?q={query}",
 }
+
+# Welche Shops für den Restock-Check aktiv gecheckt werden (nicht alle wegen Rate-Limits)
+RESTOCK_CHECK_SHOPS = [
+    "Gate to the Games", "Cardbuddys", "Games Island", "Trader Online",
+    "TCG-Corner", "Pokeviert", "Cardicuno", "Collect-It", "Kofuku",
+    "Legendary Cards", "bigpanda", "Chaos Cards (UK)", "Total Cards (UK)",
+    "Ludkins (UK)", "Amazon DE", "Smyths", "GameStop DE", "MediaMarkt",
+    "Plaza Japan", "Meccha Japan",
+]
 
 PRODUCT_HISTORY: dict  = {}
 PRODUCT_TRENDS: dict   = {}
@@ -647,38 +686,79 @@ def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = 
     )
 
 def find_product_link(search_url: str, query: str) -> str:
-    """Versucht den direkten Produktlink aus einer Shop-Suchergebnisseite zu extrahieren."""
+    """Extrahiert direkten Produktlink aus Shop-Suchergebnisseite."""
+    SKIP = {
+        "cart", "checkout", "account", "login", "register",
+        "impressum", "datenschutz", "agb", "newsletter",
+        "javascript", "mailto", "facebook", "instagram", "twitter",
+        "cookie", "privacy", "legal", "wishlist", "blog",
+    }
+    PRODUCT_PATH_HINTS = {
+        "gate-to-the-games.de":  ["/pokemon-", "/produkt", "/detail"],
+        "cardbuddys.de":         ["/products/", "/pokemon"],
+        "games-island.eu":       ["/pokemon", "/detail"],
+        "trader-online.de":      ["/pokemon", "/detail"],
+        "tcg-corner.de":         ["/products/"],
+        "pokeviert.de":          ["/produkt", "/shop"],
+        "cardicuno.de":          ["/products/"],
+        "collect-it.de":         ["/products/"],
+        "kofuku.de":             ["/produkt", "/shop"],
+        "chaoscards.co.uk":      ["/product", "/pokemon"],
+        "totalcards.net":        ["/product", "/pokemon"],
+        "ludkins.co.uk":         ["/products/"],
+        "magicmadhouse.co.uk":   ["/product"],
+        "zatugames.com":         ["/product"],
+        "plazajapan.com":        ["/product"],
+        "meccha-japan.com":      ["/pokemon"],
+        "legendary-cards.de":    ["/products/"],
+        "bigpanda.de":           ["/detail", "/produkt"],
+        "amazon.de":             ["/dp/", "/gp/product"],
+        "smythstoys.com":        ["/product", "/pokemon"],
+        "gamestop.de":           ["/products/"],
+    }
     try:
-        resp = requests.get(search_url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0"
+        resp = requests.get(search_url, timeout=12, headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
         })
-        html  = resp.text
-        links = re.findall(r'href=["\']([^"\']+)["\']', html)
+        html        = resp.text
+        domain_m    = re.search(r"https?://([^/]+)", search_url)
+        domain      = domain_m.group(1) if domain_m else ""
+        links = re.findall(r'href="([^"]+)"', html)
         query_words = [w for w in query.lower().split() if len(w) > 2]
+        path_hints  = []
+        for d, hints in PRODUCT_PATH_HINTS.items():
+            if d in domain:
+                path_hints = hints
+                break
 
         best_link  = search_url
         best_score = 0
 
         for link in links:
             link_lower = link.lower()
-            # Navigations-Links überspringen
-            skip_patterns = [
-                "search", "cart", "checkout", "account", "login",
-                "register", "impressum", "datenschutz", "kontakt",
-                "agb", "faq", "newsletter", "javascript", "#",
-            ]
-            if any(p in link_lower for p in skip_patterns):
+            if any(s in link_lower for s in SKIP):
                 continue
-
-            score = sum(1 for w in query_words if w in link_lower)
+            if link.startswith("#") or link.startswith("javascript"):
+                continue
+            word_score  = sum(1 for w in query_words if w in link_lower)
+            if word_score == 0:
+                continue
+            path_bonus  = 5 if path_hints and any(h in link_lower for h in path_hints) else 0
+            score       = word_score + path_bonus
             if score > best_score:
+                full_link = urljoin(search_url, link)
+                if domain and domain not in full_link:
+                    continue
                 best_score = score
-                best_link  = urljoin(search_url, link)
+                best_link  = full_link
 
-        if best_score >= 2:
-            return best_link
-        return search_url
-    except Exception:
+        return best_link if best_score >= 1 else search_url
+    except Exception as e:
+        print(f"⚠️ find_product_link ({search_url[:40]}): {e}")
         return search_url
 
 # ─────────────────────────────────────────
@@ -750,26 +830,32 @@ async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id  = str(query.from_user.id)
     username = query.from_user.username or ""
 
-    stripe_link = os.getenv("STRIPE_PAYMENT_LINK", "")
+    # Immer live aus Umgebungsvariablen lesen
+    stripe_link   = os.getenv("STRIPE_PAYMENT_LINK", "").strip()
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY", "").strip()
 
     if stripe_link:
-        # Stripe Payment Link mit User-ID als Parameter
-        full_link = f"{stripe_link}?client_reference_id={user_id}&prefilled_email="
+        # Stripe Payment Link mit User-ID – vollautomatische Freischaltung
+        full_link = f"{stripe_link}?client_reference_id={user_id}"
         keyboard  = [[InlineKeyboardButton(
             "💳 Jetzt abonnieren – 6,99 €/Monat",
             url=full_link
         )]]
         await query.message.reply_text(
-            f"💳 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
-            f"✅ Kreditkarte, Debitkarte, Apple Pay, Google Pay\n"
-            f"✅ Automatische Freischaltung nach Zahlung\n"
-            f"✅ Jederzeit kündbar\n\n"
-            f"Tippe auf den Button und zahle sicher über Stripe:",
+            "💳 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
+            "✅ Kreditkarte, Debitkarte, Apple Pay, Google Pay\n"
+            "✅ Automatische Freischaltung nach Zahlung\n"
+            "✅ Jederzeit kündbar\n\n"
+            "Tippe auf den Button und zahle sicher über Stripe 👇",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        await send_invoice(query.message, user_id)
+        await query.message.reply_text(
+            "⚠️ <b>Zahlung noch nicht eingerichtet.</b>\n\n"
+            "Bitte kontaktiere den Bot-Betreiber.",
+            parse_mode="HTML"
+        )
 
 async def send_invoice(message, user_id: str):
     if not STRIPE_TOKEN:
@@ -943,9 +1029,16 @@ async def send_card_details(message, card):
         + "\n".join(preis_zeilen)
     )
 
-    card_key = f"{name}|{set_id}|{number}"[:60]
+    # callback_data max 64 Bytes – nur Kartenname kürzen
+    safe_name   = name[:28].strip()
+    track_cb    = f"tc_{safe_name}"    # max ~35 Bytes
+    untrack_cb  = f"utc_{safe_name}"   # max ~35 Bytes
+
     keyboard = [
-        [InlineKeyboardButton("⭐ Karte beobachten", callback_data=f"track_{card_key}")],
+        [
+            InlineKeyboardButton("⭐ Beobachten", callback_data=track_cb),
+            InlineKeyboardButton("❌ Entfernen",  callback_data=untrack_cb),
+        ],
         [InlineKeyboardButton("🛒 Direkt auf Cardmarket", url=cm_url)],
     ]
 
@@ -1042,8 +1135,17 @@ async def _search_card(message, query: str):
         cards = [c for _, c in scored[:5]]
 
     user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
-    # Karten speichern – Key mit user_id damit parallele Suchen sich nicht überschreiben
+    # RAM Cache
     last_search_results[user_id] = cards
+    # DB Cache – überlebt Bot-Neustarts
+    now = datetime.now().isoformat()
+    cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
+    for pos, card in enumerate(cards, 1):
+        cursor.execute(
+            "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
+            (user_id, pos, json.dumps(card), now)
+        )
+    conn.commit()
 
     if not cards:
         await message.reply_text("❌ Keine Karte gefunden.")
@@ -1318,11 +1420,20 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cards = last_search_results.get(cache_id, [])
     if not cards:
-        # Fallback: eigene user_id versuchen
         cards = last_search_results.get(user_id, [])
+    # Fallback: aus DB laden (überlebt Neustarts)
+    if not cards:
+        cursor.execute(
+            "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC",
+            (user_id,)
+        )
+        rows = cursor.fetchall()
+        if rows:
+            cards = [json.loads(r[0]) for r in rows]
+            last_search_results[user_id] = cards
 
     if not cards:
-        await query.message.reply_text("❌ Bitte suche die Karte nochmal.")
+        await query.message.reply_text("❌ Bitte suche die Karte nochmal neu.")
         return
 
     if choice < 1 or choice > len(cards):
@@ -1337,14 +1448,35 @@ async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TY
     data    = query.data
     user_id = str(query.from_user.id)
 
-    if data.startswith("track_"):
-        card_name = data.replace("track_", "")
+    if data.startswith("utc_"):
+        card_name = data[4:]  # "utc_" = 4 Zeichen
+        cursor.execute(
+            "DELETE FROM tracked_cards WHERE user_id=? AND card_name=?",
+            (user_id, card_name)
+        )
+        conn.commit()
+        await query.answer("❌ Nicht mehr beobachtet", show_alert=True)
+
+    elif data.startswith("tc_"):
+        card_name = data[3:]  # "tc_" = 3 Zeichen
         cursor.execute(
             "INSERT OR IGNORE INTO tracked_cards (user_id, card_name) VALUES (?,?)",
             (user_id, card_name)
         )
         conn.commit()
-        await query.message.reply_text(f"⭐ Karte wird beobachtet: {card_name}")
+        await query.answer("⭐ Karte wird beobachtet!", show_alert=True)
+
+    elif data.startswith("untrack_"):
+        card_name = data.replace("untrack_", "").split("|")[0]
+        cursor.execute("DELETE FROM tracked_cards WHERE user_id=? AND card_name=?", (user_id, card_name))
+        conn.commit()
+        await query.answer("❌ Nicht mehr beobachtet", show_alert=True)
+
+    elif data.startswith("track_"):
+        card_name = data.replace("track_", "").split("|")[0]
+        cursor.execute("INSERT OR IGNORE INTO tracked_cards (user_id, card_name) VALUES (?,?)", (user_id, card_name))
+        conn.commit()
+        await query.answer("⭐ Karte wird beobachtet!", show_alert=True)
 
 # ─────────────────────────────────────────
 # PREISHISTORIE
@@ -1645,7 +1777,9 @@ async def job_restock_check(context: ContextTypes.DEFAULT_TYPE):
 
         encoded = product_query.replace(" ", "+")
 
-        for shop_name, pattern in SHOP_SEARCH_PATTERNS.items():
+        # Nur aktive Restock-Shops durchsuchen
+        active_shops = {k: v for k, v in SHOP_SEARCH_PATTERNS.items() if k in RESTOCK_CHECK_SHOPS}
+        for shop_name, pattern in active_shops.items():
             try:
                 search_url   = pattern.format(query=encoded)
                 product_url  = find_product_link(search_url, product_query)
@@ -1763,7 +1897,7 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     elif data.startswith("select_"):
         await button_select(update, context)
-    elif data.startswith("track_"):
+    elif data.startswith("tc_") or data.startswith("utc_") or data.startswith("track_") or data.startswith("untrack_"):
         await action_button_handler(update, context)
     elif data.startswith("trackproduct_"):
         await product_button_handler(update, context)
@@ -1946,28 +2080,41 @@ def stripe_webhook():
 
     print(f"📨 Stripe Event: {event_type}")
 
-    # Erfolgreiche Zahlung / Abo gestartet
-    if event_type in ("checkout.session.completed", "invoice.payment_succeeded", "customer.subscription.created"):
-        # User-ID aus Metadata lesen (wird beim Checkout-Link gesetzt)
-        metadata  = data_obj.get("metadata", {})
-        user_id   = metadata.get("telegram_user_id", "")
-        username  = metadata.get("telegram_username", "")
-
-        # Alternativ aus client_reference_id (bei Checkout Sessions)
-        if not user_id:
-            user_id = data_obj.get("client_reference_id", "")
-
+    # Erfolgreiche Zahlung – checkout.session.completed ist der wichtigste Event
+    if event_type == "checkout.session.completed":
+        # client_reference_id = telegram user_id (wird automatisch gesetzt)
+        user_id  = data_obj.get("client_reference_id", "")
+        metadata = data_obj.get("metadata", {})
+        username = metadata.get("telegram_username", "")
+        print(f"📨 Checkout completed: user_id={user_id}")
         if user_id:
-            activate_subscription(user_id, username)
+            activate_subscription(str(user_id), username)
         else:
-            print(f"⚠️ Kein telegram_user_id in Stripe Metadata: {metadata}")
+            print(f"⚠️ Kein client_reference_id im Checkout-Event!")
+
+    elif event_type == "invoice.payment_succeeded":
+        # Folge-Zahlung bei Abo-Verlängerung
+        sub_id    = data_obj.get("subscription", "")
+        user_id   = data_obj.get("metadata", {}).get("telegram_user_id", "")
+        if not user_id:
+            # Über Subscription die User-ID finden
+            cursor.execute(
+                "SELECT user_id FROM subscriptions WHERE telegram_payment_charge_id=?",
+                (sub_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                user_id = row[0]
+        if user_id:
+            activate_subscription(str(user_id))
+            print(f"✅ Abo verlängert für {user_id}")
 
     # Kündigung / fehlgeschlagene Zahlung
     elif event_type in ("customer.subscription.deleted", "invoice.payment_failed"):
-        metadata = data_obj.get("metadata", {})
-        user_id  = metadata.get("telegram_user_id", "")
+        user_id = data_obj.get("metadata", {}).get("telegram_user_id", "")
         if user_id:
             deactivate_subscription(user_id)
+            print(f"❌ Abo beendet für {user_id}")
 
     return "", 200
 

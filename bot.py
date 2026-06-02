@@ -126,6 +126,35 @@ def init_db():
             created_at TEXT,
             PRIMARY KEY (user_id, position)
         );
+        CREATE TABLE IF NOT EXISTS price_targets (
+            user_id    TEXT,
+            card_name  TEXT,
+            target_price REAL,
+            created_at TEXT,
+            PRIMARY KEY (user_id, card_name)
+        );
+        CREATE TABLE IF NOT EXISTS set_alerts (
+            user_id    TEXT PRIMARY KEY,
+            active     INTEGER DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS deal_alerts (
+            user_id    TEXT,
+            card_name  TEXT,
+            threshold_pct INTEGER DEFAULT 15,
+            PRIMARY KEY (user_id, card_name)
+        );
+        CREATE TABLE IF NOT EXISTS portfolio (
+            user_id    TEXT,
+            card_name  TEXT,
+            set_name   TEXT,
+            quantity   INTEGER DEFAULT 1,
+            buy_price  REAL,
+            added_at   TEXT,
+            PRIMARY KEY (user_id, card_name, set_name)
+        );
+        CREATE TABLE IF NOT EXISTS known_sets_notified (
+            set_id TEXT PRIMARY KEY
+        );
     """)
     conn.commit()
 
@@ -810,16 +839,20 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💳 Jetzt abonnieren – 6,99 €/Monat", callback_data="buy_sub")],
         ]
         await update.message.reply_text(
-            "🔓 <b>AnzarDex Premium</b>\n\n"
-            "4,99 € pro Monat – jederzeit kündbar\n\n"
-            "✅ Automatische Restock-Alerts\n"
-            "✅ Preisalarme für alle Karten & Produkte\n"
-            "✅ Alle Sets EN/DE/JP – immer aktuell\n"
-            "✅ Günstigster Cardmarket-Preis (DE)\n"
-            "✅ Unbegrenzte Watchlist\n"
-            "✅ Shop-Links bei Verfügbarkeit\n\n"
-            "<b>Zahlung:</b> Kreditkarte, Debitkarte, Apple Pay, Google Pay, PayPal\n"
-            "(Kreditkarte, Debitkarte, Apple Pay, Google Pay)",
+            "🔓 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
+            "Jederzeit kündbar · Automatische Verlängerung\n\n"
+            "🚨 <b>Restock-Alerts</b> – sofort benachrichtigt\n"
+            "wenn dein Produkt wieder verfügbar ist\n\n"
+            "🎯 <b>Preisziel-Alarm</b> – wir melden uns\n"
+            "wenn dein Wunschpreis erreicht wird\n\n"
+            "🔥 <b>Deal-Alert</b> – Meldung wenn eine Karte\n"
+            "deutlich günstiger als der Marktpreis ist\n\n"
+            "🆕 <b>Neue Set-Alerts</b> – als erster informiert\n"
+            "wenn ein neues Pokémon TCG Set erscheint\n\n"
+            "📊 <b>Portfolio-Tracker</b> – verfolge den Wert\n"
+            "deiner gesamten Kartensammlung\n\n"
+            "🌍 40+ Shops überwacht – DE, UK, JP\n\n"
+            "<b>Zahlung:</b> Kreditkarte · Apple Pay · Google Pay · Klarna",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
@@ -1061,7 +1094,13 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower()
 
-    # DE → EN alias
+    # DE Pokémon-Namen → EN übersetzen (z.B. "Glurak" → "Charizard")
+    for de_name, en_name in DE_TO_EN_POKEMON.items():
+        if query_lower.startswith(de_name) or f" {de_name} " in f" {query_lower} ":
+            query_lower = query_lower.replace(de_name, en_name, 1)
+            break
+
+    # DE Set-Namen → EN alias
     for de, en in SET_ALIASES.items():
         if de in query_lower:
             query_lower = query_lower.replace(de, en)
@@ -1662,6 +1701,391 @@ async def untrackurl(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────────────────────
 # HILFE
 # ─────────────────────────────────────────
+
+# ─────────────────────────────────────────
+# JP-SUCHE
+# ─────────────────────────────────────────
+
+# Deutsche & englische Pokémon-Namen → EN für API
+DE_TO_EN_POKEMON = {
+    # ── Gen 1 Kanto ──────────────────────────────────────
+    "bisasam":"bulbasaur","bisaknosp":"ivysaur","bisaflor":"venusaur",
+    "glumanda":"charmander","glutexo":"charmeleon","glurak":"charizard",
+    "schiggy":"squirtle","shiggy":"squirtle","schillok":"wartortle","turtok":"blastoise",
+    "raupi":"caterpie","safcon":"metapod","smettbo":"butterfree",
+    "hornliu":"weedle","kokuna":"kakuna","bibor":"beedrill",
+    "taubsi":"pidgey","tauboga":"pidgeotto","tauboss":"pidgeot",
+    "rattfratz":"rattata","rattikarl":"raticate",
+    "habitak":"spearow","ibitak":"fearow",
+    "rettan":"ekans","arbok":"arbok",
+    "pikachu":"pikachu","raichu":"raichu","pichu":"pichu",
+    "sandan":"sandshrew","sandamer":"sandslash",
+    "piepi":"clefairy","pixi":"clefable","pii":"cleffa",
+    "pummeluff":"jigglypuff","knuddeluff":"wigglytuff","knirsp":"igglybuff",
+    "zubat":"zubat","golbat":"golbat","iksbat":"crobat",
+    "myrapla":"oddish","duflor":"gloom","giflor":"vileplume","blubella":"bellossom",
+    "paras":"paras","parasek":"parasect",
+    "bluzuk":"venonat","omot":"venomoth",
+    "digda":"diglett","digdri":"dugtrio",
+    "mauzi":"meowth","snobilikat":"persian",
+    "enton":"psyduck","entoron":"golduck",
+    "menki":"mankey","rasaff":"primeape",
+    "fukano":"growlithe","arkani":"arcanine",
+    "quapsel":"poliwag","quaputzi":"poliwhirl","quappo":"poliwrath","politoed":"politoed",
+    "abra":"abra","kadabra":"kadabra","simsala":"alakazam",
+    "machollo":"machop","maschock":"machoke","machomei":"machamp",
+    "knofensa":"bellsprout","ultrigaria":"weepinbell","sarzenia":"victreebel",
+    "tentacha":"tentacool","tentoxa":"tentacruel",
+    "kleinstein":"geodude","georok":"graveler","geowaz":"golem",
+    "ponyta":"ponyta","gallopa":"rapidash",
+    "flegmon":"slowpoke","kamslower":"slowbro","laschoking":"slowking",
+    "magnetilo":"magnemite","magneton":"magneton","magnezone":"magnezone",
+    "dodu":"doduo","dodri":"dodrio",
+    "jurob":"seel","jugong":"dewgong",
+    "sleima":"grimer","sleimok":"muk",
+    "muschas":"shellder","austos":"cloyster",
+    "nebulak":"gastly","alpollo":"haunter","gengar":"gengar",
+    "onix":"onix","steelix":"steelix",
+    "schläfer":"drowzee","hypno":"hypno",
+    "krabby":"krabby","kingler":"kingler",
+    "voltobal":"voltorb","lektrobal":"electrode",
+    "owei":"exeggcute","kokowei":"exeggutor",
+    "tragosso":"cubone","knogga":"marowak",
+    "kicklee":"hitmonlee","nockchan":"hitmonchan","kapoera":"hitmontop",
+    "lippenbaby":"lickitung","schlurp":"lickilicky",
+    "smogon":"koffing","smogmog":"weezing",
+    "rihorn":"rhyhorn","rizeros":"rhydon","rihornior":"rhyperior",
+    "tangela":"tangela","tangoloss":"tangrowth",
+    "kangama":"kangaskhan",
+    "seeper":"horsea","seemon":"seadra","kingdra":"kingdra",
+    "goldini":"goldeen","golking":"seaking",
+    "sterndu":"staryu","starmie":"starmie",
+    "pantimos":"mr-mime",
+    "sichlor":"scyther","scherox":"scizor",
+    "jynx":"jynx",
+    "elektek":"electabuzz","elevoltek":"electivire","elekid":"elekid",
+    "magmar":"magmar","magbrant":"magmortar","magby":"magby",
+    "pinsir":"pinsir","tauros":"tauros",
+    "karpador":"magikarp","garados":"gyarados",
+    "lapras":"lapras","ditto":"ditto",
+    "evoli":"eevee","flamara":"flareon","aquana":"vaporeon",
+    "blitza":"jolteon","psiana":"espeon","nachtara":"umbreon",
+    "kryppuk":"glaceon","folipurba":"leafeon","feelinara":"sylveon",
+    "porygon":"porygon","porygon2":"porygon2","porygonz":"porygon-z",
+    "amonitas":"omanyte","amoroso":"omastar",
+    "kabuto":"kabuto","kabutops":"kabutops",
+    "aerodactyl":"aerodactyl","relaxo":"snorlax",
+    "arktos":"articuno","zapdos":"zapdos","lavados":"moltres",
+    "dratini":"dratini","dragonir":"dragonair","dragoran":"dragonite",
+    "mewtu":"mewtwo","zerozone":"mew",
+    # ── Gen 2 Johto ──────────────────────────────────────
+    "endivie":"chikorita","lorblatt":"bayleef","meganie":"meganium",
+    "feurigel":"cyndaquil","igelavar":"quilava","typhlosion":"typhlosion",
+    "karnimani":"totodile","tyracroc":"croconaw","impergator":"feraligatr",
+    "hoothoot":"hoothoot","noctuh":"noctowl",
+    "ledyba":"ledyba","ledian":"ledian",
+    "webarak":"spinarak","ariados":"ariados",
+    "lampi":"chinchou","lanturn":"lanturn",
+    "togepi":"togepi","togetic":"togetic","togekiss":"togekiss",
+    "natu":"natu","xatu":"xatu",
+    "voltilamm":"mareep","waaty":"flaaffy","ampharos":"ampharos",
+    "mogelbaum":"sudowoodo",
+    "snubbull":"snubbull","granbull":"granbull",
+    "qwilfish":"qwilfish","heracross":"heracross",
+    "schneppke":"sneasel","weavile":"weavile",
+    "teddiursa":"teddiursa","ursaring":"ursaring",
+    "schneckmag":"slugma","magcargo":"magcargo",
+    "quiekel":"swinub","mamutel":"piloswine",
+    "corasonn":"corsola","remoraid":"remoraid","octillery":"octillery",
+    "delibird":"delibird","mantirps":"mantine",
+    "panzaeron":"skarmory",
+    "hunduster":"houndour","hundemon":"houndoom",
+    "phanpy":"phanpy","donphan":"donphan",
+    "stantler":"stantler","miltank":"miltank",
+    "chansey":"chansey","blissey":"blissey","happiny":"happiny",
+    "raikou":"raikou","entei":"entei","suicune":"suicune",
+    "larvitar":"larvitar","pupitar":"pupitar","despotar":"tyranitar",
+    "lugia":"lugia","ho-oh":"ho-oh","celebi":"celebi",
+    # ── Gen 3 Hoenn ──────────────────────────────────────
+    "geckarbor":"treecko","reptain":"grovyle","gewaldro":"sceptile",
+    "flemmli":"torchic","jungglut":"combusken","lohgock":"blaziken",
+    "hydropi":"mudkip","moorabbel":"marshtomp","sumpex":"swampert",
+    "zigzachs":"zigzagoon","geradaks":"linoone",
+    "roselia":"roselia","roseremy":"budew","roserade":"roserade",
+    "makuhita":"makuhita","hariyama":"hariyama",
+    "azurill":"azurill","marill":"marill","azumarill":"azumarill",
+    "aron":"aron","lairon":"lairon","aggron":"aggron",
+    "meditite":"meditite","medicham":"medicham",
+    "wailmer":"wailmer","wailord":"wailord",
+    "numel":"numel","camerupt":"camerupt","torkoal":"torkoal",
+    "spoink":"spoink","groink":"grumpig",
+    "hopplo":"trapinch","vibrava":"vibrava","libelldra":"flygon",
+    "cacnea":"cacnea","cacturne":"cacturne",
+    "solrock":"solrock","lunatone":"lunatone",
+    "barschwa":"barboach","welsar":"whiscash",
+    "liliep":"lileep","corasonn":"cradily",
+    "anorith":"anorith","armaldo":"armaldo",
+    "milotic":"milotic","castform":"castform","kecleon":"kecleon",
+    "shuppet":"shuppet","banette":"banette",
+    "zwirrlicht":"duskull","zwirrklop":"dusclops","dusknoir":"dusknoir",
+    "tropius":"tropius","palimpalim":"chimecho","klingplim":"chingling",
+    "absol":"absol",
+    "snorunt":"snorunt","glalie":"glalie","froslass":"froslass",
+    "spheal":"spheal","sealeo":"sealeo","walrein":"walrein",
+    "relicanth":"relicanth","luvdisc":"luvdisc",
+    "kindwurm":"bagon","stefelz":"shelgon","brutalanda":"salamence",
+    "beldum":"beldum","metang":"metang","metagross":"metagross",
+    "regirock":"regirock","regice":"regice","registeel":"registeel",
+    "latias":"latias","latios":"latios",
+    "kyogre":"kyogre","groudon":"groudon","rayquaza":"rayquaza",
+    "jirachi":"jirachi","deoxys":"deoxys",
+    # ── Gen 4 Sinnoh ─────────────────────────────────────
+    "chelast":"turtwig","chelcarain":"grotle","chelterrar":"torterra",
+    "panflam":"chimchar","panpyro":"monferno","panferno":"infernape",
+    "plinfa":"piplup","pliprin":"prinplup","impoleon":"empoleon",
+    "staralili":"starly","staravia":"staravia","staraptor":"staraptor",
+    "bidiza":"bidoof","bidifas":"bibarel",
+    "sheinux":"shinx","luxio":"luxio","luxtra":"luxray",
+    "grantieras":"cranidos","rameidon":"rampardos",
+    "schilterus":"shieldon","bastiodon":"bastiodon",
+    "pachirisu":"pachirisu","ambidiffel":"ambipom","aipom":"aipom",
+    "driftlon":"drifloon","drifzepeli":"drifblim",
+    "haspiror":"buneary","lophauser":"lopunny",
+    "hippopotas":"hippopotas","hippoterus":"hippowdon",
+    "skorupi":"skorupi","drapion":"drapion",
+    "pantimos":"croagunk","toxiquak":"toxicroak",
+    "finneon":"finneon","lumineon":"lumineon",
+    "riolu":"riolu","lucario":"lucario",
+    "rotom":"rotom",
+    "uxie":"uxie","mesprit":"mesprit","azelf":"azelf",
+    "dialga":"dialga","palkia":"palkia","giratina":"giratina",
+    "cresellia":"cresselia","darkrai":"darkrai",
+    "shaymin":"shaymin","arceus":"arceus",
+    "mamutel":"mamoswine",
+    # ── Gen 5 Unova ──────────────────────────────────────
+    "serpifeu":"snivy","serpiroyal":"serperior",
+    "floink":"tepig","ferkelot":"pignite","flambirex":"emboar",
+    "ottaro":"oshawott","dignitas":"dewott","admurai":"samurott",
+    "zorua":"zorua","zoroark":"zoroark",
+    "minccino":"minccino","cinccino":"cinccino",
+    "emolga":"emolga","joltik":"joltik","galvantula":"galvantula",
+    "litwick":"litwick","lampent":"lampent","chandelure":"chandelure",
+    "axew":"axew","fraxure":"fraxure","haxorus":"haxorus",
+    "cubchoo":"cubchoo","beartic":"beartic",
+    "deino":"deino","zweilous":"zweilous","hydreigon":"hydreigon",
+    "larvesta":"larvesta","volcarona":"volcarona",
+    "cobalion":"cobalion","terrakion":"terrakion","virizion":"virizion",
+    "reshiram":"reshiram","zekrom":"zekrom","kyurem":"kyurem",
+    "keldeo":"keldeo","meloetta":"meloetta","genesect":"genesect",
+    "tornadus":"tornadus","thundurus":"thundurus","landorus":"landorus",
+    # ── Gen 6 Kalos ──────────────────────────────────────
+    "igamaro":"chespin","igastarnish":"quilladin","brigaron":"chesnaught",
+    "fynx":"fennekin","zweifusel":"braixen","fynara":"delphox",
+    "froxy":"froakie","frewpie":"frogadier","quabbex":"greninja",
+    "xerneas":"xerneas","yveltal":"yveltal","zygarde":"zygarde",
+    "diancie":"diancie","hoopa":"hoopa","volcanion":"volcanion",
+    "sylveon":"sylveon","hawlucha":"hawlucha","dedenne":"dedenne",
+    "klefki":"klefki","mimikyu":"mimikyu",
+    "goomy":"goomy","sliggoo":"sliggoo","goodra":"goodra",
+    "noibat":"noibat","noivern":"noivern",
+    # ── Gen 7 Alola ──────────────────────────────────────
+    "flamiau":"litten","tignar":"torracat","fuegro":"incineroar",
+    "molli":"brionne","primarina":"primarina",
+    "rockruff":"rockruff","lycanroc":"lycanroc",
+    "solgaleo":"solgaleo","lunala":"lunala",
+    "nihilego":"nihilego","buzzwole":"buzzwole","pheromosa":"pheromosa",
+    "necrozma":"necrozma","magearna":"magearna","marshadow":"marshadow",
+    "zeraora":"zeraora","meltan":"meltan","melmetal":"melmetal",
+    "tapu koko":"tapu-koko","tapu lele":"tapu-lele",
+    "tapu bulu":"tapu-bulu","tapu fini":"tapu-fini",
+    # ── Gen 8 Galar ──────────────────────────────────────
+    "zacian":"zacian","zamazenta":"zamazenta","eternatus":"eternatus",
+    "kubfu":"kubfu","urshifu":"urshifu","zarude":"zarude",
+    "regieleki":"regieleki","regidrago":"regidrago",
+    "calyrex":"calyrex","glastrier":"glastrier","spectrier":"spectrier",
+    "hopplo":"scorbunny","raboot":"raboot","liberlo":"cinderace",
+    "rillaboom":"rillaboom",
+    "morpeko":"morpeko","cufant":"cufant","copperajah":"copperajah",
+    # ── Gen 9 Paldea ─────────────────────────────────────
+    "felori":"sprigatito","floragato":"floragato","meowscarada":"meowscarada",
+    "krokel":"fuecoco","crocalor":"crocalor","skeledirge":"skeledirge",
+    "kwaks":"quaxly","kwaxo":"quaxwell","quaquaval":"quaquaval",
+    "lechonk":"lechonk","oinkologne":"oinkologne",
+    "pawmi":"pawmi","pawmo":"pawmo","pawmot":"pawmot",
+    "fidough":"fidough","dachsbun":"dachsbun",
+    "charcadet":"charcadet","armarouge":"armarouge","ceruledge":"ceruledge",
+    "bellibolt":"bellibolt","kilowattrel":"kilowattrel",
+    "klawf":"klawf","tinkaton":"tinkaton","tinkatink":"tinkatink",
+    "finizen":"finizen","palafin":"palafin",
+    "gholdengo":"gholdengo","gimmighoul":"gimmighoul",
+    "koraidon":"koraidon","miraidon":"miraidon",
+    "wo-chien":"wo-chien","chien-pao":"chien-pao",
+    "ting-lu":"ting-lu","chi-yu":"chi-yu",
+    "terapagos":"terapagos","pecharunt":"pecharunt",
+    "ogerpon":"ogerpon","archaludon":"archaludon","hydrapple":"hydrapple",
+    "great tusk":"great-tusk","scream tail":"scream-tail",
+    "brute bonnet":"brute-bonnet","flutter mane":"flutter-mane",
+    "iron hands":"iron-hands","iron treads":"iron-treads",
+    "iron bundle":"iron-bundle","iron valiant":"iron-valiant",
+    "roaring moon":"roaring-moon","gouging fire":"gouging-fire",
+    "raging bolt":"raging-bolt","iron crown":"iron-crown",
+    "iron boulder":"iron-boulder",
+}
+
+# JP Set-IDs für die API
+JP_SET_IDS = {
+    "151 jp":                "sv2a",
+    "pokemon card 151":      "sv2a",
+    "shiny treasure":        "sv4a",
+    "shiny treasure ex":     "sv4a",
+    "vstar universe":        "swsh12pt5",
+    "ruler of the black flame": "sv3a",
+    "terastal festival":     "sv6a",
+    "terastal festival ex":  "sv6a",
+    "night wanderer":        "sv6pt5",
+    "battle partners":       "sv9",
+    "crimson haze":          "sv5a",
+    "mask of change":        "sv6",
+    "wild force":            "sv5M",
+    "cyber judge":           "sv5R",
+    "paradise dragona":      "sv7R",
+    "ancient roar":          "sv4M",
+    "future flash":          "sv4K",
+    "clay burst":            "sv2D",
+    "snow hazard":           "sv2P",
+    "triplet beat":          "sv1a",
+    "dark phantasma":        "swsh11a",
+    "incandescent arcana":   "swsh11",
+    "lost abyss":            "swsh10a",
+    "vmax climax":           "swsh8a",
+    "blue sky stream":       "swsh7a",
+    "eevee heroes":          "swsh6a",
+}
+
+async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """JP-Suche: /jp shiggy 151 jp"""
+    if not context.args:
+        await update.message.reply_text(
+            "🇯🇵 <b>Japanische Karten suchen</b>\n\n"
+            "Benutze: /jp KARTENNAME SET\n\n"
+            "<b>Beispiele:</b>\n"
+            "/jp squirtle 151 jp\n"
+            "/jp shiggy 151 jp\n"
+            "/jp charizard shiny treasure ex\n"
+            "/jp pikachu vstar universe\n"
+            "/jp umbreon vmax climax\n\n"
+            "<b>Verfügbare JP-Sets:</b>\n"
+            "• 151 jp\n"
+            "• shiny treasure ex\n"
+            "• vstar universe\n"
+            "• ruler of the black flame\n"
+            "• terastal festival\n"
+            "• night wanderer\n"
+            "• battle partners\n"
+            "• crimson haze\n"
+            "• wild force / cyber judge\n"
+            "• vmax climax\n"
+            "• eevee heroes",
+            parse_mode="HTML"
+        )
+        return
+
+    query = " ".join(context.args).lower()
+
+    # DE-Name → EN übersetzen
+    pokemon_name = query
+    for de, en in DE_TO_EN_POKEMON.items():
+        if query.startswith(de):
+            pokemon_name = query.replace(de, en, 1)
+            break
+
+    # JP-Set erkennen
+    matched_set_id = None
+    matched_set_name = None
+    for jp_name, set_id in JP_SET_IDS.items():
+        if jp_name in pokemon_name:
+            matched_set_id   = set_id
+            matched_set_name = jp_name
+            # Setname aus Suchstring entfernen
+            pokemon_name = pokemon_name.replace(jp_name, "").strip()
+            break
+
+    # Kartenname bereinigen
+    card_name = pokemon_name.strip()
+    if not card_name:
+        await update.message.reply_text("❌ Bitte einen Kartennamen angeben.")
+        return
+
+    await update.message.reply_text(f"🔍 Suche JP: <b>{card_name}</b>" + (f" aus <b>{matched_set_name}</b>" if matched_set_name else ""), parse_mode="HTML")
+
+    # API-Suche
+    url = "https://api.pokemontcg.io/v2/cards"
+    api_query = f'name:"{card_name}"'
+    if matched_set_id:
+        api_query += f" set.id:{matched_set_id}"
+
+    try:
+        resp = requests.get(url, params={"q": api_query, "pageSize": 20}, timeout=10)
+        cards = resp.json().get("data", [])
+    except Exception:
+        await update.message.reply_text("❌ API nicht erreichbar, bitte erneut versuchen.")
+        return
+
+    if not cards:
+        # Fallback: ohne Anführungszeichen suchen
+        try:
+            resp = requests.get(url, params={"q": f"name:{card_name}" + (f" set.id:{matched_set_id}" if matched_set_id else ""), "pageSize": 20}, timeout=10)
+            cards = resp.json().get("data", [])
+        except Exception:
+            cards = []
+
+    if not cards:
+        await update.message.reply_text(
+            f"❌ Keine JP-Karte gefunden für: <b>{card_name}</b>\n\n"
+            f"Tipp: Benutze den englischen Namen.\n"
+            f"Shiggy → squirtle, Glurak → charizard",
+            parse_mode="HTML"
+        )
+        return
+
+    user_id = str(update.effective_user.id)
+    last_search_results[user_id] = cards[:8]
+
+    # In DB cachen
+    try:
+        now = datetime.now().isoformat()
+        cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
+        for pos, card in enumerate(cards[:8], 1):
+            cursor.execute(
+                "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
+                (user_id, pos, json.dumps(card, ensure_ascii=False), now)
+            )
+        conn.commit()
+    except Exception:
+        pass
+
+    if len(cards) == 1:
+        await send_card_details(update.message, cards[0])
+        return
+
+    keyboard = []
+    for idx, card in enumerate(cards[:8], 1):
+        prices = card.get("cardmarket", {}).get("prices", {})
+        trend  = prices.get("trendPrice", "?")
+        set_nm = card.get("set", {}).get("name", "?")
+        num    = card.get("number", "?")
+        keyboard.append([InlineKeyboardButton(
+            f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
+            callback_data=f"sel_{user_id}_{idx}"
+        )])
+
+    await update.message.reply_text(
+        f"🇯🇵 <b>JP-Ergebnisse für: {card_name}</b>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "🤖 <b>AnzarDex TCG Bot – Hilfe</b>\n\n"
@@ -1914,8 +2338,268 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
         await remove_product_handler(update, context)
     elif data.startswith("removecard_"):
         await remove_card_handler(update, context)
+    elif data == "clear_portfolio":
+        await portfolio_clear(update, context)
+    elif data == "clear_preisziele":
+        await clear_preisziele_handler(update, context)
     else:
         await query.answer()
+
+
+# ═════════════════════════════════════════════════════════
+# FEATURE 1: PREISALARM – User setzt Wunschpreis
+# ═════════════════════════════════════════════════════════
+@require_sub
+async def setpreisziel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Benutze: /preisziel Charizard ex 50"""
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "🎯 <b>Preisziel setzen</b>\n\n"
+            "Benutze: /preisziel KARTENNAME PREIS\n\n"
+            "Beispiele:\n"
+            "/preisziel Charizard ex 50\n"
+            "/preisziel Umbreon VMAX 30\n\n"
+            "Du wirst benachrichtigt wenn der Preis diesen Wert unterschreitet.",
+            parse_mode="HTML"
+        )
+        return
+    try:
+        target = float(context.args[-1].replace(",", "."))
+        card_name = " ".join(context.args[:-1])
+    except ValueError:
+        await update.message.reply_text("❌ Bitte einen Preis angeben, z.B. /preisziel Charizard ex 50")
+        return
+
+    user_id = str(update.effective_user.id)
+    now = datetime.now().isoformat()
+    cursor.execute(
+        "INSERT INTO price_targets (user_id, card_name, target_price, created_at) VALUES (?,?,?,?) "
+        "ON CONFLICT(user_id, card_name) DO UPDATE SET target_price=excluded.target_price",
+        (user_id, card_name, target, now)
+    )
+    conn.commit()
+    await update.message.reply_text(
+        f"🎯 <b>Preisziel gesetzt!</b>\n\n"
+        f"🃏 {card_name}\n"
+        f"💰 Alert wenn Preis unter <b>{target} €</b> fällt\n\n"
+        f"Du wirst sofort benachrichtigt!",
+        parse_mode="HTML"
+    )
+
+@require_sub
+async def meinepreisziele(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    cursor.execute("SELECT card_name, target_price FROM price_targets WHERE user_id=?", (user_id,))
+    rows = cursor.fetchall()
+    if not rows:
+        await update.message.reply_text("Du hast noch keine Preisziele gesetzt.\n/preisziel Charizard ex 50")
+        return
+    text = "🎯 <b>Deine Preisziele</b>\n\n"
+    for card_name, target in rows:
+        text += f"🃏 {card_name} → unter {target} €\n"
+    keyboard = [[InlineKeyboardButton("❌ Alle löschen", callback_data="clear_preisziele")]]
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+
+# ═════════════════════════════════════════════════════════
+# FEATURE 2: NEUE SET-ALERTS
+# ═════════════════════════════════════════════════════════
+@require_sub
+async def setalert_sets(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    cursor.execute(
+        "INSERT INTO set_alerts (user_id, active) VALUES (?,1) "
+        "ON CONFLICT(user_id) DO UPDATE SET active=1",
+        (user_id,)
+    )
+    conn.commit()
+    await update.message.reply_text(
+        "🆕 <b>Neue-Set-Alerts aktiviert!</b>\n\n"
+        "Du wirst sofort benachrichtigt wenn ein neues Pokémon TCG Set angekündigt wird oder erscheint.\n\n"
+        "/setalert_sets_off zum Deaktivieren",
+        parse_mode="HTML"
+    )
+
+async def setalert_sets_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    cursor.execute("UPDATE set_alerts SET active=0 WHERE user_id=?", (user_id,))
+    conn.commit()
+    await update.message.reply_text("🔕 Neue-Set-Alerts deaktiviert.")
+
+# ═════════════════════════════════════════════════════════
+# FEATURE 4: DEAL-ALERT – Karte günstiger als normal
+# ═════════════════════════════════════════════════════════
+@require_sub
+async def setdeal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Benutze: /deal Charizard ex 20  (alert wenn 20% günstiger als Trend)"""
+    if len(context.args) < 1:
+        await update.message.reply_text(
+            "🔥 <b>Deal-Alert setzen</b>\n\n"
+            "Benutze: /deal KARTENNAME PROZENT\n\n"
+            "Beispiel:\n"
+            "/deal Charizard ex 20\n\n"
+            "Du wirst benachrichtigt wenn die Karte mehr als 20% unter dem Trend-Preis angeboten wird.\n"
+            "Standard: 15% wenn kein Prozent angegeben.",
+            parse_mode="HTML"
+        )
+        return
+    try:
+        pct = int(context.args[-1])
+        card_name = " ".join(context.args[:-1]) if len(context.args) > 1 else context.args[0]
+        if not card_name or pct < 1:
+            raise ValueError
+    except ValueError:
+        pct = 15
+        card_name = " ".join(context.args)
+
+    user_id = str(update.effective_user.id)
+    cursor.execute(
+        "INSERT INTO deal_alerts (user_id, card_name, threshold_pct) VALUES (?,?,?) "
+        "ON CONFLICT(user_id, card_name) DO UPDATE SET threshold_pct=excluded.threshold_pct",
+        (user_id, card_name, pct)
+    )
+    conn.commit()
+    await update.message.reply_text(
+        f"🔥 <b>Deal-Alert aktiviert!</b>\n\n"
+        f"🃏 {card_name}\n"
+        f"📉 Alert wenn Preis <b>{pct}% unter Trend-Preis</b> fällt\n\n"
+        f"Ich prüfe alle 5 Minuten!",
+        parse_mode="HTML"
+    )
+
+# ═════════════════════════════════════════════════════════
+# FEATURE 6: PORTFOLIO-TRACKER
+# ═════════════════════════════════════════════════════════
+@require_sub
+async def portfolio_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Benutze: /portfolio_add Charizard ex 151 2 89.99"""
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(
+            "📊 <b>Portfolio – Karte hinzufügen</b>\n\n"
+            "Benutze: /portfolio_add KARTENNAME | ANZAHL | KAUFPREIS\n\n"
+            "Beispiele:\n"
+            "/portfolio_add Charizard ex 151 | 1 | 89.99\n"
+            "/portfolio_add Umbreon VMAX | 2 | 45.00\n\n"
+            "Der Bot verfolgt den aktuellen Wert deiner Sammlung!",
+            parse_mode="HTML"
+        )
+        return
+    full = " ".join(args)
+    parts = [p.strip() for p in full.split("|")]
+    if len(parts) == 3:
+        card_name, qty_str, price_str = parts
+        set_name = ""
+    elif len(parts) == 2:
+        card_name, qty_str = parts
+        price_str = "0"
+        set_name = ""
+    else:
+        card_name = full
+        qty_str = "1"
+        price_str = "0"
+        set_name = ""
+
+    try:
+        qty   = max(1, int(qty_str))
+        price = float(price_str.replace(",", "."))
+    except ValueError:
+        qty   = 1
+        price = 0.0
+
+    user_id = str(update.effective_user.id)
+    now     = datetime.now().isoformat()
+    cursor.execute(
+        "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
+        "VALUES (?,?,?,?,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
+        "quantity=quantity+excluded.quantity, buy_price=excluded.buy_price",
+        (user_id, card_name.strip(), set_name, qty, price, now)
+    )
+    conn.commit()
+    total = qty * price
+    await update.message.reply_text(
+        f"📊 <b>Zum Portfolio hinzugefügt!</b>\n\n"
+        f"🃏 {card_name.strip()}\n"
+        f"📦 Anzahl: {qty}x\n"
+        f"💰 Kaufpreis: {price} € pro Stück\n"
+        f"💵 Gesamt investiert: {total:.2f} €\n\n"
+        f"/portfolio zum Gesamtüberblick",
+        parse_mode="HTML"
+    )
+
+@require_sub
+async def portfolio_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    cursor.execute(
+        "SELECT card_name, set_name, quantity, buy_price FROM portfolio WHERE user_id=? ORDER BY card_name",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        await update.message.reply_text(
+            "📊 Dein Portfolio ist leer.\n\n"
+            "Füge Karten hinzu mit:\n"
+            "/portfolio_add Charizard ex 151 | 1 | 89.99"
+        )
+        return
+
+    await update.message.reply_text("📊 <b>Dein Portfolio wird berechnet...</b>", parse_mode="HTML")
+
+    total_invested = 0.0
+    total_current  = 0.0
+    lines = []
+
+    for card_name, set_name, qty, buy_price in rows:
+        invested = qty * buy_price
+        total_invested += invested
+        # Aktuellen Preis von API holen
+        cards = search_pokemon_card(card_name, set_name if set_name else None)
+        current_price = 0.0
+        if cards:
+            prices = cards[0].get("cardmarket", {}).get("prices", {})
+            current_price = prices.get("trendPrice") or prices.get("lowPrice") or 0.0
+        current_total = qty * current_price
+        total_current += current_total
+        diff     = current_total - invested
+        diff_pct = (diff / invested * 100) if invested > 0 else 0
+        emoji    = "📈" if diff >= 0 else "📉"
+        lines.append(
+            f"{emoji} <b>{card_name}</b>\n"
+            f"   {qty}x · Kauf: {buy_price:.2f}€ · Jetzt: {current_price:.2f}€ · "
+            f"{'+'if diff>=0 else ''}{diff:.2f}€ ({diff_pct:+.1f}%)"
+        )
+
+    gesamtdiff     = total_current - total_invested
+    gesamtdiff_pct = (gesamtdiff / total_invested * 100) if total_invested > 0 else 0
+    gesamtemoji    = "📈" if gesamtdiff >= 0 else "📉"
+
+    text = (
+        f"📊 <b>Dein Portfolio</b>\n\n"
+        + "\n".join(lines)
+        + f"\n\n{'─'*25}\n"
+        f"💰 Investiert: <b>{total_invested:.2f} €</b>\n"
+        f"💵 Aktueller Wert: <b>{total_current:.2f} €</b>\n"
+        f"{gesamtemoji} Gesamt: <b>{'+'if gesamtdiff>=0 else ''}{gesamtdiff:.2f} € ({gesamtdiff_pct:+.1f}%)</b>"
+    )
+
+    keyboard = [[InlineKeyboardButton("🗑 Portfolio leeren", callback_data="clear_portfolio")]]
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def portfolio_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = str(query.from_user.id)
+    cursor.execute("DELETE FROM portfolio WHERE user_id=?", (user_id,))
+    conn.commit()
+    await query.message.edit_text("🗑 Portfolio geleert.")
+
+async def clear_preisziele_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = str(query.from_user.id)
+    cursor.execute("DELETE FROM price_targets WHERE user_id=?", (user_id,))
+    conn.commit()
+    await query.message.edit_text("❌ Alle Preisziele gelöscht.")
+
 
 # ─────────────────────────────────────────
 # ADMIN
@@ -2136,6 +2820,128 @@ def run_flask():
     print(f"🌐 Flask Webhook läuft auf Port {port}")
     flask_app.run(host="0.0.0.0", port=port, debug=False)
 
+
+# ═════════════════════════════════════════════════════════
+# JOBS: Preisziele, Deal-Alerts, Neue Sets
+# ═════════════════════════════════════════════════════════
+async def job_price_targets(context: ContextTypes.DEFAULT_TYPE):
+    """Prüft ob Preisziele erreicht wurden."""
+    cursor.execute("SELECT user_id, card_name, target_price FROM price_targets")
+    targets = cursor.fetchall()
+    for user_id, card_name, target_price in targets:
+        if not is_subscribed(user_id):
+            continue
+        try:
+            cards = search_pokemon_card(card_name)
+            if not cards:
+                continue
+            prices    = cards[0].get("cardmarket", {}).get("prices", {})
+            low_price = prices.get("lowPrice") or prices.get("trendPrice")
+            if not low_price:
+                continue
+            if float(low_price) <= float(target_price):
+                cm_url = cards[0].get("cardmarket", {}).get("url", "")
+                if cm_url and not cm_url.startswith("http"):
+                    cm_url = "https://www.cardmarket.com" + cm_url
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        f"🎯 <b>PREISZIEL ERREICHT!</b>\n\n"
+                        f"🃏 <b>{card_name}</b>\n"
+                        f"💰 Aktueller Preis: <b>{low_price} €</b>\n"
+                        f"🎯 Dein Ziel: {target_price} €\n\n"
+                        f"{'<a href="' + cm_url + '">🛒 Jetzt kaufen auf Cardmarket</a>' if cm_url else '🛒 Jetzt auf Cardmarket kaufen!'}"
+                    ),
+                    parse_mode="HTML",
+                    disable_web_page_preview=True
+                )
+        except Exception as e:
+            print(f"⚠️ Preisziel-Check Fehler: {e}")
+
+async def job_deal_alerts(context: ContextTypes.DEFAULT_TYPE):
+    """Prüft ob Karten deutlich unter Trend-Preis sind."""
+    cursor.execute("SELECT user_id, card_name, threshold_pct FROM deal_alerts")
+    deals = cursor.fetchall()
+    for user_id, card_name, threshold_pct in deals:
+        if not is_subscribed(user_id):
+            continue
+        try:
+            cards = search_pokemon_card(card_name)
+            if not cards:
+                continue
+            prices     = cards[0].get("cardmarket", {}).get("prices", {})
+            trend      = prices.get("trendPrice")
+            low        = prices.get("lowPrice")
+            if not trend or not low:
+                continue
+            discount   = ((float(trend) - float(low)) / float(trend)) * 100
+            if discount >= threshold_pct:
+                cm_url = cards[0].get("cardmarket", {}).get("url", "")
+                if cm_url and not cm_url.startswith("http"):
+                    cm_url = "https://www.cardmarket.com" + cm_url
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        f"🔥 <b>DEAL GEFUNDEN!</b>\n\n"
+                        f"🃏 <b>{card_name}</b>\n"
+                        f"💰 Günstigster Preis: <b>{low} €</b>\n"
+                        f"📉 Trend-Preis: {trend} €\n"
+                        f"🔥 <b>{discount:.0f}% unter Trend!</b>\n\n"
+                        f"{'<a href="' + cm_url + '">🛒 Jetzt zuschlagen!</a>' if cm_url else '🛒 Jetzt auf Cardmarket!'}"
+                    ),
+                    parse_mode="HTML",
+                    disable_web_page_preview=True
+                )
+        except Exception as e:
+            print(f"⚠️ Deal-Alert Fehler: {e}")
+
+async def job_new_sets(context: ContextTypes.DEFAULT_TYPE):
+    """Prüft ob neue Sets erschienen sind und benachrichtigt Abonnenten."""
+    global ALL_SETS
+    try:
+        resp = requests.get(
+            "https://api.pokemontcg.io/v2/sets",
+            params={"pageSize": 10, "orderBy": "-releaseDate"},
+            timeout=15
+        )
+        new_sets_data = resp.json().get("data", [])
+        cursor.execute("SELECT user_id FROM set_alerts WHERE active=1")
+        users = [r[0] for r in cursor.fetchall()]
+
+        for s in new_sets_data:
+            set_id   = s.get("id", "")
+            set_name = s.get("name", "")
+            release  = s.get("releaseDate", "")
+            # Prüfen ob schon bekannt
+            cursor.execute("SELECT 1 FROM known_sets_notified WHERE set_id=?", (set_id,))
+            if cursor.fetchone():
+                continue
+            # Neu! Alle User benachrichtigen
+            cursor.execute("INSERT OR IGNORE INTO known_sets_notified (set_id) VALUES (?)", (set_id,))
+            conn.commit()
+            # Sets-Cache aktualisieren
+            ALL_SETS[set_name.lower()] = set_id
+            for user_id in users:
+                if not is_subscribed(user_id):
+                    continue
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=(
+                            f"🆕 <b>NEUES SET ERSCHIENEN!</b>\n\n"
+                            f"📦 <b>{set_name}</b>\n"
+                            f"📅 Release: {release}\n\n"
+                            f"Suche jetzt Karten aus diesem Set!\n"
+                            f"Tippe einfach einen Kartennamen + <b>{set_name}</b>"
+                        ),
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"⚠️ Neue-Sets-Check Fehler: {e}")
+
+
 def main():
     global telegram_app_ref
     app = Application.builder().token(BOT_TOKEN).build()
@@ -2144,10 +2950,13 @@ def main():
     jq  = app.job_queue
 
     # Jobs
-    jq.run_repeating(job_price_check,      interval=300,   first=15)   # alle 5 Min
-    jq.run_repeating(job_restock_check,    interval=600,   first=30)   # alle 10 Min
-    jq.run_repeating(job_url_restock_check,interval=600,   first=45)   # alle 10 Min
-    jq.run_repeating(job_refresh_sets,     interval=86400, first=3600) # täglich
+    jq.run_repeating(job_price_check,      interval=300,   first=15)
+    jq.run_repeating(job_restock_check,    interval=600,   first=30)
+    jq.run_repeating(job_url_restock_check,interval=600,   first=45)
+    jq.run_repeating(job_refresh_sets,     interval=86400, first=3600)
+    jq.run_repeating(job_price_targets,    interval=300,   first=60)   # Preisziele
+    jq.run_repeating(job_deal_alerts,      interval=300,   first=90)   # Deal-Alerts
+    jq.run_repeating(job_new_sets,         interval=3600,  first=120)  # Neue Sets
 
     # Commands
     app.add_handler(CommandHandler("start",        start))
@@ -2174,6 +2983,14 @@ def main():
     app.add_handler(CommandHandler("admin",        admin_stats))
     app.add_handler(CommandHandler("adduser",      admin_adduser))
     app.add_handler(CommandHandler("removeuser",   admin_removeuser))
+    app.add_handler(CommandHandler("preisziel",    setpreisziel))
+    app.add_handler(CommandHandler("meinepreisziele", meinepreisziele))
+    app.add_handler(CommandHandler("setalert_sets",setalert_sets))
+    app.add_handler(CommandHandler("setalert_sets_off", setalert_sets_off))
+    app.add_handler(CommandHandler("deal",         setdeal))
+    app.add_handler(CommandHandler("portfolio_add",portfolio_add))
+    app.add_handler(CommandHandler("portfolio",    portfolio_show))
+    app.add_handler(CommandHandler("jp",           jp_search))
 
     # Payments
 

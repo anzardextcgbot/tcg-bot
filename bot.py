@@ -876,10 +876,24 @@ async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]]
         await query.message.reply_text(
             "💳 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
-            "✅ Kreditkarte, Debitkarte, Apple Pay, Google Pay\n"
+            "Das bekommst du mit Premium:\n\n"
+            "🚨 <b>Restock-Alerts</b>\n"
+            "Sofort benachrichtigt wenn ein Produkt wieder verfügbar ist – mit direktem Shop-Link.\n\n"
+            "🎯 <b>Preisziel-Alarm</b>\n"
+            "Wir melden uns automatisch wenn dein Wunschpreis erreicht wird.\n\n"
+            "🔥 <b>Deal-Alert</b>\n"
+            "Automatische Meldung wenn eine Karte deutlich günstiger als der Marktpreis ist.\n\n"
+            "🆕 <b>Neue Set-Alerts</b>\n"
+            "Als erster informiert wenn ein neues Pokémon TCG Set erscheint.\n\n"
+            "📊 <b>Portfolio-Tracker</b>\n"
+            "Verfolge jederzeit den aktuellen Gesamtwert deiner Sammlung.\n\n"
+            "🌍 <b>40+ Shops</b> – DE, UK & JP überwacht\n"
+            "💰 Günstigster Cardmarket-Preis immer dabei\n\n"
+            "─────────────────────\n"
+            "✅ Kreditkarte · Apple Pay · Google Pay · Klarna\n"
             "✅ Automatische Freischaltung nach Zahlung\n"
-            "✅ Jederzeit kündbar\n\n"
-            "Tippe auf den Button und zahle sicher über Stripe 👇",
+            "✅ Jederzeit kündbar – kein Risiko\n\n"
+            "👇 Tippe auf den Button und starte jetzt:",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -1092,7 +1106,79 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
-    query_lower = query.lower()
+    query_lower = query.lower().strip()
+
+    # JP-Erkennung: wenn " jp" am Ende oder ein JP-Set-Name vorkommt → JP-Suche
+    is_jp = query_lower.endswith(" jp")
+    if not is_jp:
+        for jp_name in JP_SET_IDS.keys():
+            if jp_name in query_lower:
+                is_jp = True
+                break
+    if is_jp:
+        # Fake Update-Objekt für jp_search nutzen geht nicht direkt
+        # Stattdessen: direkt JP-Logik hier inline
+        jp_query = query_lower
+        # DE Namen → EN
+        for de_name, en_name in DE_TO_EN_POKEMON.items():
+            if jp_query.startswith(de_name) or f" {de_name} " in f" {jp_query} ":
+                jp_query = jp_query.replace(de_name, en_name, 1)
+                break
+        # JP-Set erkennen
+        matched_set_id = None
+        for jp_name, set_id in JP_SET_IDS.items():
+            if jp_name in jp_query:
+                matched_set_id = set_id
+                jp_query = jp_query.replace(jp_name, "").strip()
+                break
+        # " jp" suffix entfernen
+        jp_query = jp_query.replace(" jp", "").strip()
+        if not jp_query:
+            await message.reply_text("❌ Bitte einen Kartennamen angeben.")
+            return
+        # API-Suche
+        url = "https://api.pokemontcg.io/v2/cards"
+        api_q = f'name:"{jp_query}"' + (f" set.id:{matched_set_id}" if matched_set_id else "")
+        try:
+            resp  = requests.get(url, params={"q": api_q, "pageSize": 20}, timeout=10)
+            cards = resp.json().get("data", [])
+        except Exception:
+            cards = []
+        if not cards:
+            await message.reply_text(f"❌ Keine JP-Karte gefunden für: {jp_query}")
+            return
+        user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
+        last_search_results[user_id] = cards[:8]
+        try:
+            now = datetime.now().isoformat()
+            cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
+            for pos, card in enumerate(cards[:8], 1):
+                cursor.execute(
+                    "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
+                    (user_id, pos, json.dumps(card, ensure_ascii=False), now)
+                )
+            conn.commit()
+        except Exception:
+            pass
+        if len(cards) == 1:
+            await send_card_details(message, cards[0])
+            return
+        keyboard = []
+        for idx, card in enumerate(cards[:8], 1):
+            prices = card.get("cardmarket", {}).get("prices", {})
+            trend  = prices.get("trendPrice", "?")
+            set_nm = card.get("set", {}).get("name", "?")
+            num    = card.get("number", "?")
+            keyboard.append([InlineKeyboardButton(
+                f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
+                callback_data=f"sel_{user_id}_{idx}"
+            )])
+        await message.reply_text(
+            f"🇯🇵 JP-Ergebnisse für: <b>{jp_query}</b>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
 
     # DE Pokémon-Namen → EN übersetzen (z.B. "Glurak" → "Charizard")
     for de_name, en_name in DE_TO_EN_POKEMON.items():

@@ -602,36 +602,48 @@ PRODUCT_EN_TO_DE = {
 }
 
 def get_cardmarket_de_url(product_query: str) -> str:
+    """Gibt Cardmarket Suchergebnisseite zurück – zeigt ALLE passenden Produkte."""
     q = product_query.lower().strip()
     # EN Set-Namen → DE übersetzen
     for en, de in EN_TO_DE_SETS.items():
         if en in q:
             q = q.replace(en, de)
-    # Produkttypen → DE übersetzen
-    for en, de in PRODUCT_EN_TO_DE.items():
-        if en in q:
-            q = q.replace(en, de)
-    encoded = q.replace(" ", "%20")
+    # Produkttypen NICHT übersetzen – Suchbegriff breit lassen
+    # damit alle Varianten (18er, 36er, Case etc.) erscheinen
+    # Nur ETB/UPC expandieren weil CM die kennt
+    q = re.sub(r"\betb\b", "Elite Trainer Box", q)
+    q = re.sub(r"\bupc\b", "Ultra Premium Collection", q)
+    encoded = q.strip().replace(" ", "%20")
     return (
         f"https://www.cardmarket.com/de/Pokemon/Products/Search"
-        f"?searchString={encoded}&sellerCountry=7"
+        f"?searchString={encoded}&sellerCountry=7&sortBy=price_asc"
     )
 
 def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = None) -> str:
-    # Set-Name auf Deutsch übersetzen für CM
-    de_set = set_name or ""
-    for en, de in EN_TO_DE_SETS.items():
-        if en.lower() in de_set.lower():
-            de_set = de
-            break
-    # Suchstring: Kartenname + DE Set-Name
-    q = card_name
+    """Gibt direkten Cardmarket Singles Link zurück – mit DE Set-Name + Kartennummer."""
+    de_set = ""
+    if set_name:
+        # EN → DE übersetzen
+        set_lower = set_name.lower()
+        for en, de in EN_TO_DE_SETS.items():
+            if en in set_lower:
+                de_set = de
+                break
+        if not de_set:
+            de_set = set_name  # Fallback: original behalten
+
+    # Suchstring aufbauen: Kartenname + DE Set-Name + Nummer falls vorhanden
+    parts = [card_name]
     if de_set:
-        q += f" {de_set}"
+        parts.append(de_set)
+    if number and number.isdigit():
+        parts.append(number)
+
+    q       = " ".join(parts)
     encoded = q.replace(" ", "%20")
     return (
         f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search"
-        f"?searchString={encoded}&sellerCountry=7&minCondition=2"
+        f"?searchString={encoded}&minCondition=2&sortBy=price_asc"
     )
 
 def find_product_link(search_url: str, query: str) -> str:
@@ -899,18 +911,25 @@ async def send_card_details(message, card):
     number  = card.get("number", "?")
     rarity  = card.get("rarity", "Unbekannt")
     image   = card.get("images", {}).get("large")
-    prices  = card.get("cardmarket", {}).get("prices", {})
+    cm_data = card.get("cardmarket", {})
+    prices  = cm_data.get("prices", {})
 
     trend = prices.get("trendPrice")
     low   = prices.get("lowPrice")
     avg   = prices.get("averageSellPrice")
 
-    # Cardmarket DE – direkt zur richtigen Karte
-    cm_url = get_cardmarket_card_url(name, set_nm, number)
+    # Direkter Cardmarket Link aus der API – geht DIREKT zur richtigen Karte
+    cm_url = cm_data.get("url", "")
+    if cm_url:
+        if not cm_url.startswith("http"):
+            cm_url = "https://www.cardmarket.com" + cm_url
+    else:
+        # Fallback: Suchanfrage ohne DE-Filter
+        cm_url = get_cardmarket_card_url(name, set_nm, number if number.isdigit() else None)
 
     preis_zeilen = []
     if low:
-        preis_zeilen.append(f"💰 <b>Günstigster Preis (DE):</b> {low} €")
+        preis_zeilen.append(f"💰 <b>Günstigster Preis:</b> {low} €")
     if trend:
         preis_zeilen.append(f"📉 <b>Trend:</b> {trend} €")
     if avg:
@@ -924,11 +943,10 @@ async def send_card_details(message, card):
         + "\n".join(preis_zeilen)
     )
 
-    # Eindeutiger callback_data mit Set-ID + Nummer
     card_key = f"{name}|{set_id}|{number}"[:60]
     keyboard = [
         [InlineKeyboardButton("⭐ Karte beobachten", callback_data=f"track_{card_key}")],
-        [InlineKeyboardButton("🛒 Cardmarket DE – Günstigster Preis", url=cm_url)],
+        [InlineKeyboardButton("🛒 Direkt auf Cardmarket", url=cm_url)],
     ]
 
     if image:
@@ -1064,13 +1082,14 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
 
     search_query = normalize_product_query(query)
-    cm_url       = get_cardmarket_de_url(search_query)
+    # Für CM-Link: Original-Query nehmen damit alle Varianten erscheinen
+    cm_url = get_cardmarket_de_url(query)
 
     text = (
         f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"🏷 <b>Typ:</b> {product_type}\n\n"
-        f"🛒 Cardmarket zeigt dir den günstigsten DE-Preis.\n"
+        f"🛒 Cardmarket zeigt alle Varianten (18er, 36er, Case etc.) sortiert nach Preis.\n"
         f"🔔 Aktiviere den Restock-Alert – du wirst sofort benachrichtigt\n"
         f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
     )

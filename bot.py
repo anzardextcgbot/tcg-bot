@@ -210,7 +210,7 @@ def require_sub(func):
             keyboard = [[InlineKeyboardButton("🔓 Jetzt abonnieren", callback_data="buy_sub")]]
             await update.message.reply_text(
                 "🔒 Diese Funktion ist nur für Abonnenten verfügbar.\n\n"
-                "📦 AnzarDex Premium – 4,99 €/Monat\n"
+                "📦 AnzarDexBot Premium – 4,99 €/Monat\n"
                 "✅ Restock-Alerts für alle Produkte\n"
                 "✅ Preisalarme für alle Karten\n"
                 "✅ Alle Sets EN/DE/JP\n"
@@ -1066,12 +1066,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+    keyboard_start = [[InlineKeyboardButton("📖 Alle Funktionen anzeigen", callback_data="show_help")]]
+
     await update.message.reply_text(
-        f"🃏 <b>AnzarDex TCG Bot</b>\n\n"
+        f"🃏 <b>AnzarDexBot</b>\n\n"
         f"Dein persönlicher Pokémon TCG Tracker 🔥\n\n"
         f"Status: {sub_text}\n\n"
-        f"Einfach einen Produktnamen oder Kartennamen eintippen!\n"
-        f"<i>Beispiele: 151 etb · charizard 151 · destined rivals display</i>",
+        f"<b>Schnellstart:</b>\n"
+        f"• Karte suchen: <code>charizard 151</code>\n"
+        f"• Produkt suchen: <code>151 etb</code>\n"
+        f"• JP-Karte: <code>charizard 151 jp</code>\n"
+        f"• Alle Befehle: /hilfe\n\n"
+        f"<i>Restock-Alerts, Preisziele, Portfolio & mehr mit Premium 🔒</i>",
         parse_mode="HTML",
         reply_markup=reply_markup,
     )
@@ -1100,7 +1106,7 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💳 Jetzt abonnieren – 6,99 €/Monat", callback_data="buy_sub")],
         ]
         await update.message.reply_text(
-            "🔓 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
+            "🔓 <b>AnzarDexBot Premium – 6,99 €/Monat</b>\n\n"
             "Jederzeit kündbar · Automatische Verlängerung\n\n"
             "🚨 <b>Restock-Alerts</b> – sofort benachrichtigt\n"
             "wenn dein Produkt wieder verfügbar ist\n\n"
@@ -1136,7 +1142,7 @@ async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             url=full_link
         )]]
         await query.message.reply_text(
-            "💳 <b>AnzarDex Premium – 6,99 €/Monat</b>\n\n"
+            "💳 <b>AnzarDexBot Premium – 6,99 €/Monat</b>\n\n"
             "Das bekommst du mit Premium:\n\n"
             "🚨 <b>Restock-Alerts</b>\n"
             "Sofort benachrichtigt wenn ein Produkt wieder verfügbar ist – mit direktem Shop-Link.\n\n"
@@ -1184,7 +1190,7 @@ async def send_invoice(message, user_id: str):
         payload=f"sub_{user_id}",
         provider_token=STRIPE_TOKEN,
         currency=CURRENCY,
-        prices=[LabeledPrice("AnzarDex Premium – 1 Monat", MONTHLY_PRICE)],
+        prices=[LabeledPrice("AnzarDexBot Premium – 1 Monat", MONTHLY_PRICE)],
         need_name=False,
         need_email=False,
         is_flexible=False,
@@ -1219,7 +1225,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     conn.commit()
 
     await update.message.reply_text(
-        "🎉 <b>Zahlung erfolgreich! Willkommen bei AnzarDex Premium!</b>\n\n"
+        "🎉 <b>Zahlung erfolgreich! Willkommen bei AnzarDexBot Premium!</b>\n\n"
         "✅ Restock-Alerts aktiv\n"
         "✅ Preisalarme aktiv\n"
         "✅ Alle Sets EN/DE/JP\n\n"
@@ -1674,10 +1680,13 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Ein Link – nimmt "case" weil Cardmarket das meist findet
     # Wenn nicht gefunden, User kann manuell "karton" tippen
+    # Karton-Link nur wenn "case" im Query
     keyboard = [
-        [InlineKeyboardButton("🛒 Cardmarket – Alle Varianten", url=cm_url_case)],
-        [InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")],
+        [InlineKeyboardButton("🛒 Cardmarket – als Case", url=cm_url_case)],
     ]
+    if cm_url_karton:
+        keyboard.append([InlineKeyboardButton("🛒 Cardmarket – als Karton", url=cm_url_karton)])
+    keyboard.append([InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")])
 
     await update.message.reply_text(
         text, parse_mode="HTML",
@@ -2570,30 +2579,85 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "🤖 <b>AnzarDex TCG Bot – Hilfe</b>\n\n"
-        "🔍 <b>Suchen (einfach eintippen):</b>\n"
-        "charizard 151\n"
-        "pikachu ex surging sparks\n"
-        "umbreon vmax evolving skies\n"
-        "destined rivals etb\n"
-        "151 display\n\n"
-        "📦 <b>Produkt-Befehle:</b>\n"
-        "/trackproduct 151 etb – Restock-Alert\n"
-        "/myproducts – Deine Alerts\n"
-        "/trackurl https://… – Shop-URL tracken\n\n"
-        "🃏 <b>Karten-Befehle:</b>\n"
-        "/preis pikachu\n"
-        "/track charizard\n"
-        "/preishistory charizard\n"
-        "/setalert 5 – Alert bei ±5€\n"
-        "/setdrops on – Nur Preis-Drops\n\n"
-        "📦 <b>Sets:</b>\n"
-        "/allsets – Alle bekannten Sets\n"
-        "/favset 151 – Set favorisieren\n"
-        "/meinesets\n\n"
-        "💳 <b>Abo:</b>\n"
-        "/abo – Abo verwalten\n\n"
-        "<i>Für Restock-Alerts brauchst du ein Premium-Abo (4,99€/Monat)</i>"
+        "🤖 <b>AnzarDexBot – Alle Funktionen</b>\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔍 <b>KARTEN SUCHEN</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Einfach eintippen – kein Befehl nötig:\n"
+        "<code>charizard 151</code>\n"
+        "<code>glurak 151</code> (deutsch funktioniert!)\n"
+        "<code>umbreon vmax evolving skies</code>\n"
+        "<code>pikachu ex surging sparks</code>\n\n"
+        "🇯🇵 Für japanische Karten: <b>jp</b> ans Ende:\n"
+        "<code>charizard 151 jp</code>\n"
+        "<code>umbreon vmax climax jp</code>\n"
+        "<code>nachtara drachenwandel jp</code>\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📦 <b>PRODUKTE SUCHEN</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Einfach eintippen:\n"
+        "<code>151 etb</code>\n"
+        "<code>destined rivals display</code>\n"
+        "<code>mega evolution case</code>\n"
+        "<code>surging sparks booster bundle</code>\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🚨 <b>RESTOCK-ALERTS</b> 🔒 Premium\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Bei Produktsuche auf 🔔 <b>Restock-Alert aktivieren</b> drücken.\n"
+        "Du wirst sofort benachrichtigt wenn das Produkt\n"
+        "wieder verfügbar ist – mit direktem Shop-Link.\n"
+        "/myproducts – Deine aktiven Alerts anzeigen\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🎯 <b>PREISZIEL-ALARM</b> 🔒 Premium\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/preisziel Charizard ex 50</code>\n"
+        "→ Alert wenn Karte unter 50€ fällt\n"
+        "/meinepreisziele – Alle Preisziele anzeigen\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 <b>DEAL-ALERT</b> 🔒 Premium\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/deal Umbreon VMAX 20</code>\n"
+        "→ Alert wenn Karte 20% unter Trend-Preis fällt\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🆕 <b>NEUE SET-ALERTS</b> 🔒 Premium\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/setalert_sets</code> aktivieren\n"
+        "→ Sofort benachrichtigt wenn neues Set erscheint\n"
+        "<code>/setalert_sets_off</code> deaktivieren\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📊 <b>PORTFOLIO-TRACKER</b> 🔒 Premium\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/portfolio_add Charizard ex 151 | 2 | 89.99</code>\n"
+        "→ Karte mit Anzahl und Kaufpreis eintragen\n"
+        "<code>/portfolio</code> – Gesamtwert + Gewinn/Verlust\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "💰 <b>PREISE & VERLAUF</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/preishistory Charizard</code> – Preisverlauf\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📦 <b>SETS</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/allsets</code> – Alle bekannten Sets\n"
+        "<code>/favset 151</code> – Set favorisieren\n"
+        "<code>/meinesets</code> – Favoriten anzeigen\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "💳 <b>ABO</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<code>/abo</code> – Premium für 6,99€/Monat\n"
+        "Kreditkarte · Apple Pay · Google Pay · Klarna\n"
+        "Jederzeit kündbar – automatische Freischaltung\n\n"
+
+        "<i>🔒 = Nur für Premium-Abonnenten</i>"
     )
     await update.message.reply_text(text, parse_mode="HTML")
 
@@ -3115,7 +3179,7 @@ async def admin_adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=target_id,
             text=(
-                "🎉 <b>Willkommen bei AnzarDex Premium!</b>\n\n"
+                "🎉 <b>Willkommen bei AnzarDexBot Premium!</b>\n\n"
                 "Dein Abo wurde aktiviert.\n"
                 "✅ Restock-Alerts aktiv\n"
                 "✅ Preisalarme aktiv\n"
@@ -3198,7 +3262,7 @@ def activate_subscription(user_id: str, username: str = ""):
                 await telegram_app_ref.bot.send_message(
                     chat_id=user_id,
                     text=(
-                        "🎉 <b>Zahlung bestätigt! Willkommen bei AnzarDex Premium!</b>\n\n"
+                        "🎉 <b>Zahlung bestätigt! Willkommen bei AnzarDexBot Premium!</b>\n\n"
                         "✅ Restock-Alerts aktiv\n"
                         "✅ Preisalarme aktiv\n"
                         "✅ Alle Sets EN/DE/JP\n\n"
@@ -3543,6 +3607,7 @@ def main():
     app.add_handler(CommandHandler("meinesets",    meinesets))
     app.add_handler(CommandHandler("unfavset",     unfavset))
     app.add_handler(CommandHandler("help",         help_command))
+    app.add_handler(CommandHandler("hilfe",        help_command))
     app.add_handler(CommandHandler("admin",        admin_stats))
     app.add_handler(CommandHandler("adduser",      admin_adduser))
     app.add_handler(CommandHandler("removeuser",   admin_removeuser))

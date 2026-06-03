@@ -1725,6 +1725,35 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text       = update.message.text
     text_lower = text.lower()
 
+    # Warte auf Preis-Eingabe für Preisziel
+    if context.user_data.get("awaiting_preisziel"):
+        try:
+            target    = float(text.replace(",", ".").replace("€", "").strip())
+            card_info = context.user_data.pop("awaiting_preisziel")
+            card_name = card_info["card_name"]
+            set_name  = card_info["set_name"]
+            user_id   = str(update.effective_user.id)
+            db_key    = f"{card_name}|{set_name}" if set_name else card_name
+            cursor.execute(
+                "INSERT INTO price_targets (user_id, card_name, target_price, created_at) VALUES (?,?,?,?) "
+                "ON CONFLICT(user_id, card_name) DO UPDATE SET target_price=excluded.target_price",
+                (user_id, db_key, target, datetime.now().isoformat())
+            )
+            conn.commit()
+            await update.message.reply_text(
+                f"\U0001f3af <b>Preisziel gesetzt!</b>\n\n"
+
+                + (f"\U0001f0cf <b>{card_name}</b> \u00b7 {set_name}" if set_name else f"\U0001f0cf <b>{card_name}</b>") + "\n"
+
+                + f"\U0001f4b0 Alert wenn Preis unter <b>{target} \u20ac</b> f\u00e4llt\n\n"
+
+                + "\u2705 Ich pr\u00fcfe alle 5 Minuten!",
+            )
+            return
+        except ValueError:
+            context.user_data.pop("awaiting_preisziel", None)
+            # Kein gültiger Preis – normal weitersuchen
+
     # Menü-Buttons
     if text == "🔍 Suchen":
         await update.message.reply_text(
@@ -1973,18 +2002,18 @@ async def deal_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     set_name  = parts[1] if len(parts) > 1 else ""
 
     # Mit 15% Standard-Schwelle speichern
+    db_key = f"{card_name}|{set_name}" if set_name else card_name
     cursor.execute(
         "INSERT INTO deal_alerts (user_id, card_name, threshold_pct) VALUES (?,?,15) "
         "ON CONFLICT(user_id, card_name) DO UPDATE SET threshold_pct=15",
-        (user_id, f"{card_name}|{set_name}")
+        (user_id, db_key)
     )
     conn.commit()
 
     await query.message.reply_text(
         f"🔥 <b>Deal-Alert aktiviert!</b>\n\n"
-        f"🃏 {card_name} · {set_name}\n"
+        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"\n"
         f"📉 Alert wenn Preis <b>15% unter Trend-Preis</b> fällt\n\n"
-        f"Eigene Schwelle: <code>/deal {card_name} 20</code>\n"
         f"<i>Prüft alle 5 Minuten.</i>",
         parse_mode="HTML"
     )
@@ -2015,35 +2044,38 @@ async def portfolio_add_callback(update: Update, context: ContextTypes.DEFAULT_T
         (user_id,)
     )
     rows = cursor.fetchall()
+    # Preis aus Cache holen
     current_price = None
-    for row in rows:
+    cursor.execute(
+        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC LIMIT 10",
+        (user_id,)
+    )
+    for row in cursor.fetchall():
         try:
             c = json.loads(row[0])
             if c.get("name","").lower() == card_name.lower():
-                prices = c.get("cardmarket",{}).get("prices",{})
+                prices = c.get("cardmarket",{}).get("prices",{}) or {}
                 current_price = prices.get("lowPrice") or prices.get("trendPrice")
                 break
         except Exception:
             pass
 
-    price_hint = f" · Aktuell: {current_price} €" if current_price else ""
+    price_hint = f" · {current_price} €" if current_price else ""
 
-    # Mit 1x und aktuellem Preis sofort ins Portfolio
     now = datetime.now().isoformat()
     cursor.execute(
         "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
         "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
-        "quantity=quantity+1",
+        "quantity=quantity+1, buy_price=excluded.buy_price",
         (user_id, card_name, set_name, current_price or 0.0, now)
     )
     conn.commit()
 
     await query.message.reply_text(
         f"📊 <b>Portfolio aktualisiert!</b>\n\n"
-        f"🃏 {card_name} · {set_name}{price_hint}\n"
-        f"➕ 1x hinzugefügt\n\n"
-        f"/portfolio – Gesamtwert anzeigen\n"
-        f"<i>Kaufpreis anpassen: /portfolio_add {card_name} | 1 | PREIS</i>",
+        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"{price_hint}\n"
+        f"➕ 1x hinzugefügt · Kaufpreis: {current_price or 0} €\n\n"
+        f"/portfolio – Gesamtwert anzeigen",
         parse_mode="HTML"
     )
 
@@ -2061,45 +2093,42 @@ async def preisziel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
-    card_key = query.data.replace("pz_", "")
-    parts    = card_key.split("|")
-    card_name = parts[0] if parts else card_key
-    set_name  = parts[1] if len(parts) > 1 else ""
-    number    = parts[2] if len(parts) > 2 else ""
+    card_key  = query.data.replace("pz_", "")
+    parts     = card_key.split("|")
+    card_name = parts[0].strip() if parts else card_key
+    set_name  = parts[1].strip() if len(parts) > 1 else ""
+    number    = parts[2].strip() if len(parts) > 2 else ""
 
-    # Preis aus letzter Suche holen
+    # Aktuellen Preis aus Cache
+    current_price = None
     cursor.execute(
-        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC LIMIT 8",
+        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC LIMIT 10",
         (user_id,)
     )
-    rows = cursor.fetchall()
-    current_price = None
-    for row in rows:
+    for row in cursor.fetchall():
         try:
             c = json.loads(row[0])
             if c.get("name","").lower() == card_name.lower():
-                prices = c.get("cardmarket",{}).get("prices",{})
+                prices = c.get("cardmarket",{}).get("prices",{}) or {}
                 current_price = prices.get("lowPrice") or prices.get("trendPrice")
                 break
         except Exception:
             pass
 
-    price_hint = f"\n\U0001f4b0 Aktuell: {current_price} €" if current_price else ""
+    price_hint = f"\n\U0001f4b0 Aktueller Preis: <b>{current_price} \u20ac</b>" if current_price else ""
 
-
-    # In DB als "warte auf Preisziel" speichern
-    cursor.execute(
-        "INSERT OR REPLACE INTO price_targets (user_id, card_name, target_price, created_at) VALUES (?,?,?,?)",
-        (user_id, f"{card_name}|{set_name}", -1, datetime.now().isoformat())
-    )
-    conn.commit()
+    # Karte in user_data speichern – warten auf direkte Preis-Eingabe
+    context.user_data["awaiting_preisziel"] = {
+        "card_name": card_name,
+        "set_name":  set_name,
+        "number":    number,
+    }
 
     await query.message.reply_text(
-        f"🎯 <b>Preisziel setzen</b>\n\n"
-        f"🃏 {card_name} · {set_name} · #{number}{price_hint}\n\n"
-        f"Schreib jetzt deinen Wunschpreis:\n"
-        f"<code>/preisziel {card_name} 50</code>\n\n"
-        f"<i>Der Bot benachrichtigt dich sobald der Preis darunter fällt.</i>",
+        f"\U0001f3af <b>Preisziel setzen</b>\n\n"
+        f"\U0001f0cf <b>{card_name}</b> \u00b7 {set_name} \u00b7 #{number}{price_hint}\n\n"
+        f"Schreib einfach deinen <b>Wunschpreis in \u20ac</b>:\n"
+        f"<i>(z.B. 50 oder 49.99)</i>",
         parse_mode="HTML"
     )
 
@@ -3313,8 +3342,18 @@ async def portfolio_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cards = search_pokemon_card(card_name, set_name if set_name else None)
         current_price = 0.0
         if cards:
-            prices = cards[0].get("cardmarket", {}).get("prices", {})
-            current_price = prices.get("trendPrice") or prices.get("lowPrice") or 0.0
+            for card in cards:
+                if not isinstance(card, dict):
+                    continue
+                s = card.get("set", {})
+                sname = s.get("name","").lower() if isinstance(s, dict) else ""
+                if set_name and set_name.lower() in sname:
+                    prices = card.get("cardmarket", {}).get("prices", {}) or {}
+                    current_price = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
+                    break
+            if not current_price and isinstance(cards[0], dict):
+                prices = cards[0].get("cardmarket", {}).get("prices", {}) or {}
+                current_price = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
         current_total = qty * current_price
         total_current += current_total
         diff     = current_total - invested
@@ -3620,36 +3659,64 @@ async def job_deal_alerts(context: ContextTypes.DEFAULT_TYPE):
     """Prüft ob Karten deutlich unter Trend-Preis sind."""
     cursor.execute("SELECT user_id, card_name, threshold_pct FROM deal_alerts")
     deals = cursor.fetchall()
-    for user_id, card_name, threshold_pct in deals:
+    for user_id, card_name_raw, threshold_pct in deals:
         if not is_subscribed(user_id):
             continue
         try:
-            cards = search_pokemon_card(card_name)
+            # card_name kann "Charizard ex|151" Format haben
+            parts     = card_name_raw.split("|")
+            card_name = parts[0].strip()
+            set_name  = parts[1].strip() if len(parts) > 1 else None
+
+            cards = search_pokemon_card(card_name, set_name)
             if not cards:
                 continue
-            prices     = cards[0].get("cardmarket", {}).get("prices", {})
-            trend      = prices.get("trendPrice")
-            low        = prices.get("lowPrice")
+
+            # Beste Karte finden (richtiges Set)
+            best_card = None
+            for card in cards:
+                if isinstance(card, dict):
+                    s = card.get("set", {})
+                    sname = s.get("name","").lower() if isinstance(s, dict) else ""
+                    if set_name and set_name.lower() in sname:
+                        best_card = card
+                        break
+            if not best_card:
+                best_card = cards[0] if isinstance(cards[0], dict) else None
+            if not best_card:
+                continue
+
+            prices = best_card.get("cardmarket", {}).get("prices", {}) or {}
+            trend  = prices.get("trendPrice")
+            low    = prices.get("lowPrice")
             if not trend or not low:
                 continue
-            discount   = ((float(trend) - float(low)) / float(trend)) * 100
-            if discount >= threshold_pct:
-                cm_url = cards[0].get("cardmarket", {}).get("url", "")
-                if cm_url and not cm_url.startswith("http"):
-                    cm_url = "https://www.cardmarket.com" + cm_url
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=(
-                        f"🔥 <b>DEAL GEFUNDEN!</b>\n\n"
-                        f"🃏 <b>{card_name}</b>\n"
-                        f"💰 Günstigster Preis: <b>{low} €</b>\n"
-                        f"📉 Trend-Preis: {trend} €\n"
-                        f"🔥 <b>{discount:.0f}% unter Trend!</b>\n\n"
-                        f"{'<a href="' + cm_url + '">🛒 Jetzt zuschlagen!</a>' if cm_url else '🛒 Jetzt auf Cardmarket!'}"
-                    ),
-                    parse_mode="HTML",
-                    disable_web_page_preview=True
-                )
+
+            discount = ((float(trend) - float(low)) / float(trend)) * 100
+            if discount < threshold_pct:
+                continue
+
+            cm_url = best_card.get("cardmarket", {}).get("url", "")
+            if cm_url and not cm_url.startswith("http"):
+                cm_url = "https://www.cardmarket.com" + cm_url
+            if not cm_url:
+                q = f"{card_name} {set_name or ''}".strip().replace(" ", "%20")
+                cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
+
+            display_name = card_name + (f" | {set_name}" if set_name else "")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=(
+                    f"🔥 <b>DEAL GEFUNDEN!</b>\n\n"
+                    f"🃏 <b>{display_name}</b>\n"
+                    f"💰 Günstigster Preis: <b>{low} €</b>\n"
+                    f"📉 Trend-Preis: {trend} €\n"
+                    f"🔥 <b>{discount:.0f}% unter Trend!</b>\n\n"
+                    f"<a href='{cm_url}'>🛒 Jetzt zuschlagen!</a>"
+                ),
+                parse_mode="HTML",
+                disable_web_page_preview=True
+            )
         except Exception as e:
             print(f"⚠️ Deal-Alert Fehler: {e}")
 

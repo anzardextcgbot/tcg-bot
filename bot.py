@@ -1676,13 +1676,15 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Produkttyp erkennen
     product_type = "Produkt"
+    import re as _re2
     for kw, pname in PRODUCT_TYPES.items():
-        if kw in query_lower:
+        pattern = r'\b' + _re2.escape(kw) + r'\b'
+        if _re2.search(pattern, query_lower):
             product_type = pname
             break
 
     # Case-Erkennung direkt im Query – unabhängig vom Produkttyp-Loop
-    is_case = "case" in query_lower or "karton" in query_lower
+    is_case = bool(_re2.search(r'\bcase\b', query_lower)) or bool(_re2.search(r'\bkarton\b', query_lower))
 
     search_query = normalize_product_query(query)
 
@@ -1728,38 +1730,87 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Warte auf Kaufpreis-Eingabe für Portfolio
     if context.user_data.get("awaiting_portfolio"):
+        info = context.user_data.get("awaiting_portfolio")
+        step = info.get("step", "buy_price")
         try:
-            buy_price = float(text.replace(",", ".").replace("€", "").strip())
-            info      = context.user_data.pop("awaiting_portfolio")
-            card_name = info["card_name"]
-            set_name  = info["set_name"]
-            cur_price = info.get("current_price") or buy_price
-            user_id   = str(update.effective_user.id)
-            now       = datetime.now().isoformat()
+            entered = float(text.replace(",", ".").replace("€", "").strip())
+        except ValueError:
+            context.user_data.pop("awaiting_portfolio", None)
+            await update.message.reply_text("❌ Bitte eine Zahl eingeben.")
+            return
 
-            # 0 eingegeben → aktuellen Marktpreis nehmen
-            if buy_price == 0:
-                buy_price = cur_price or 0.0
+        if step == "buy_price":
+            # Kaufpreis gespeichert → jetzt aktuellen Wert fragen
+            cur_price = info.get("current_price")
+            if entered == 0:
+                entered = cur_price or 0.0
+            info["buy_price"] = entered
+            info["step"]      = "current_value"
+            context.user_data["awaiting_portfolio"] = info
 
+            cur_hint = f"Marktpreis aktuell: <b>{cur_price} €</b>" if cur_price else "Kein Marktpreis verfügbar"
+            await update.message.reply_text(
+                f"📊 <b>Portfolio – Schritt 2/2</b>\n\n"
+                f"💰 Kaufpreis gespeichert: <b>{entered} €</b>\n\n"
+                f"📈 <b>Was ist die Karte aktuell wert?</b>\n"
+                f"{cur_hint}\n\n"
+                f"Aktuellen Wert eintippen oder <b>0</b> für Marktpreis:",
+                parse_mode="HTML"
+            )
+            return
+
+        elif step == "current_value":
+            # Alles gespeichern
+            buy_price  = info["buy_price"]
+            card_name  = info["card_name"]
+            set_name   = info["set_name"]
+            cur_price  = info.get("current_price")
+            user_id    = str(update.effective_user.id)
+            now        = datetime.now().isoformat()
+            context.user_data.pop("awaiting_portfolio", None)
+
+            if entered == 0:
+                entered = cur_price or buy_price
+
+            # current_value als extra Feld in card_name kodieren
+            db_key = f"{card_name}|{set_name}" if set_name else card_name
+
+            cursor.execute(
+                "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
+                "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
+                "quantity=quantity+1, buy_price=excluded.buy_price",
+                (user_id, db_key, f"{set_name}|val:{entered}", buy_price, now)
+            )
+
+            # Sauberere Variante: set_name normal + aktuellen Wert in price_history
             cursor.execute(
                 "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
                 "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
                 "quantity=quantity+1, buy_price=excluded.buy_price",
                 (user_id, card_name, set_name, buy_price, now)
             )
+            # Aktuellen Wert als manuellen Override speichern
+            cursor.execute(
+                "INSERT INTO price_history (card_name, price, checked_at) VALUES (?,?,?)",
+                (f"MANUAL|{card_name}|{set_name}", entered, now)
+            )
             conn.commit()
+
+            diff     = entered - buy_price
+            diff_pct = (diff / buy_price * 100) if buy_price > 0 else 0
+            emoji    = "📈" if diff >= 0 else "📉"
 
             await update.message.reply_text(
                 f"📊 <b>Portfolio aktualisiert!</b>\n\n"
                 f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + "\n"
                 f"➕ 1x hinzugefügt\n"
-                f"💰 Kaufpreis: <b>{buy_price} €</b>\n\n"
+                f"💰 Kaufpreis: <b>{buy_price} €</b>\n"
+                f"📈 Aktueller Wert: <b>{entered} €</b>\n"
+                f"{emoji} {'+'if diff>=0 else ''}{diff:.2f} € ({diff_pct:+.1f}%)\n\n"
                 f"/portfolio – Gesamtwert anzeigen",
                 parse_mode="HTML"
             )
             return
-        except ValueError:
-            context.user_data.pop("awaiting_portfolio", None)
 
     # Warte auf Preis-Eingabe für Preisziel
     if context.user_data.get("awaiting_preisziel"):
@@ -1827,17 +1878,21 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_command(update, context)
         return
 
-    # Produkt-Erkennung (EN + DE Keywords)
-    DE_PRODUCT_KEYWORDS = [
-        "booster display", "top trainer box", "trainer box",
-        "ultra premium", "kollektion", "display", "tin", "case",
-        "elite trainer", "bundle", "booster"
+    # Produkt-Erkennung – nur als ganzes Wort (nicht "tin" in "giratina")
+    import re as _re
+    PRODUCT_WORDS = [
+        "etb", "display", "booster bundle", "mini tin", "tin", "case", "upc",
+        "collection box", "premium collection", "trainer box", "ttb",
+        "build and battle", "booster bundle", "bundle", "top trainer box",
+        "elite trainer box", "ultra premium collection",
     ]
-
-    is_product = any(
-         re.search(rf"\b{re.escape(kw)}\b", text_lower)
-         for kw in PRODUCT_KEYWORDS + DE_PRODUCT_KEYWORDS
-    )
+    is_product = False
+    for kw in PRODUCT_WORDS:
+        # Ganzes Wort matchen mit Word-Boundary
+        pattern = r'\b' + _re.escape(kw) + r'\b'
+        if _re.search(pattern, text_lower):
+            is_product = True
+            break
     context.args = text.split()
 
     if is_product:
@@ -2102,19 +2157,20 @@ async def portfolio_add_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     price_hint = f" · {current_price} €" if current_price else ""
 
-    # Karte in user_data speichern – warten auf Kaufpreis-Eingabe
+    # Karte in user_data speichern – Schritt 1: Kaufpreis
     context.user_data["awaiting_portfolio"] = {
         "card_name":     card_name,
         "set_name":      set_name,
         "current_price": current_price,
+        "step":          "buy_price",
     }
 
+    price_display = f" · Marktpreis: <b>{current_price} €</b>" if current_price else ""
     await query.message.reply_text(
-        f"📊 <b>Portfolio – Kaufpreis eingeben</b>\n\n"
-        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"{price_hint}\n\n"
-        f"Wie viel hast du bezahlt? Schreib einfach den Preis:\n"
-        f"<i>(z.B. 89.99 oder 45)</i>\n\n"
-        f"Oder schreib <b>0</b> um den aktuellen Marktpreis zu nehmen.",
+        f"📊 <b>Portfolio – Schritt 1/2</b>\n\n"
+        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"{price_display}\n\n"
+        f"💰 <b>Was hast du bezahlt?</b> Preis eintippen:\n"
+        f"<i>(z.B. 89.99 oder 0 für Marktpreis)</i>",
         parse_mode="HTML"
     )
 
@@ -3325,21 +3381,29 @@ async def portfolio_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
         invested = qty * buy_price
         total_invested += invested
 
-        # Aktuellen Preis von API holen – mit richtigem Set
-        cards = search_pokemon_card(card_name, set_name if set_name else None)
-        current_price = 0.0
-        if cards:
-            for card in cards:
-                if not isinstance(card, dict):
-                    continue
-                s     = card.get("set", {})
-                sname = s.get("name","").lower() if isinstance(s, dict) else ""
-                if not set_name or set_name.lower() in sname:
-                    prices = card.get("cardmarket", {}).get("prices", {}) or {}
-                    p = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
-                    if p > 0:
-                        current_price = p
-                        break
+        # Erst manuell eingetragenen Wert prüfen
+        cursor.execute(
+            "SELECT price FROM price_history WHERE card_name=? ORDER BY checked_at DESC LIMIT 1",
+            (f"MANUAL|{card_name}|{set_name}",)
+        )
+        manual_row    = cursor.fetchone()
+        current_price = float(manual_row[0]) if manual_row else 0.0
+
+        # Falls kein manueller Wert → API
+        if not current_price:
+            cards = search_pokemon_card(card_name, set_name if set_name else None)
+            if cards:
+                for card in cards:
+                    if not isinstance(card, dict):
+                        continue
+                    s     = card.get("set", {})
+                    sname = s.get("name","").lower() if isinstance(s, dict) else ""
+                    if not set_name or set_name.lower() in sname:
+                        prices = card.get("cardmarket", {}).get("prices", {}) or {}
+                        p = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
+                        if p > 0:
+                            current_price = p
+                            break
         current_total = qty * current_price
         total_current += current_total
         diff     = current_total - invested

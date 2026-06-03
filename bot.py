@@ -1130,10 +1130,10 @@ async def abo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         keyboard = [
-            [InlineKeyboardButton("💳 Jetzt abonnieren – 6,99 €/Monat", callback_data="buy_sub")],
+            [InlineKeyboardButton("💳 Jetzt abonnieren – 4,99 €/Monat", callback_data="buy_sub")],
         ]
         await update.message.reply_text(
-            "🔓 <b>AnzarDexBot Premium – 6,99 €/Monat</b>\n\n"
+            "🔓 <b>AnzarDexBot Premium – 4,99 €/Monat</b>\n\n"
             "Jederzeit kündbar · Automatische Verlängerung\n\n"
             "🚨 <b>Restock-Alerts</b> – sofort benachrichtigt\n"
             "wenn dein Produkt wieder verfügbar ist\n\n"
@@ -1165,11 +1165,11 @@ async def buy_sub_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Stripe Payment Link mit User-ID – vollautomatische Freischaltung
         full_link = f"{stripe_link}?client_reference_id={user_id}"
         keyboard  = [[InlineKeyboardButton(
-            "💳 Jetzt abonnieren – 6,99 €/Monat",
+            "💳 Jetzt abonnieren – 4,99 €/Monat",
             url=full_link
         )]]
         await query.message.reply_text(
-            "💳 <b>AnzarDexBot Premium – 6,99 €/Monat</b>\n\n"
+            "💳 <b>AnzarDexBot Premium – 4,99 €/Monat</b>\n\n"
             "Das bekommst du mit Premium:\n\n"
             "🚨 <b>Restock-Alerts</b>\n"
             "Sofort benachrichtigt wenn ein Produkt wieder verfügbar ist – mit direktem Shop-Link.\n\n"
@@ -2857,7 +2857,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━\n"
         "💳 <b>ABO</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<code>/abo</code> – Premium für 6,99€/Monat\n"
+        "<code>/abo</code> – Premium für 4,99€/Monat\n"
         "Kreditkarte · Apple Pay · Google Pay · Klarna\n"
         "Jederzeit kündbar – automatische Freischaltung\n\n"
 
@@ -3003,12 +3003,12 @@ async def job_restock_check(context: ContextTypes.DEFAULT_TYPE):
                 # Alert senden mit direktem Shop-Link + Alert deaktivieren Button
                 cm_url = get_cardmarket_de_url(product_query)
                 text   = (
-                    f"🚨 <b>RESTOCK GEFUNDEN!</b> 🚨\n\n"
+                    f"🚨 <b>RESTOCK!</b> 🚨\n\n"
                     f"📦 <b>{product_query.upper()}</b>\n"
-                    f"🏪 Shop: <b>{shop_name}</b>\n\n"
-                    f"🛒 <b>Direkt zum Produkt:</b>\n{product_url}\n\n"
-                    f"💳 <b>Cardmarket DE:</b>\n{cm_url}\n\n"
-                    f"⚡ <i>Schnell sein – Restocks sind oft schnell ausverkauft!</i>"
+                    f"🏪 <b>{shop_name}</b>\n\n"
+                    f"🛒 <a href='{product_url}'>Direkt zum Produkt</a>\n"
+                    f"💳 <a href='{cm_url}'>Cardmarket DE</a>\n\n"
+                    f"⚡ <i>Schnell sein!</i>"
                 )
                 alert_keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton(
@@ -3991,19 +3991,43 @@ async def job_pokemon_center_check(context: ContextTypes.DEFAULT_TYPE):
         else:
             product_list = "• Neue Produkte verfügbar"
 
+        # Direkte Produkt-Links aus der Seite extrahieren
+        import re as _re
+        product_links = []
+        raw_links = _re.findall(r'href="(/(?:de-de|en-gb)/product/[^"]+)"', resp.text)
+        base_domain = "https://www.pokemoncenter.com"
+        seen_links = set()
+        for link in raw_links[:15]:
+            full_link = base_domain + link
+            if full_link not in seen_links:
+                seen_links.add(full_link)
+                # Produktnamen aus URL extrahieren
+                slug = link.split("/product/")[-1].split("?")[0]
+                name_from_url = slug.replace("-", " ").replace("/", " ").strip().title()
+                product_links.append((name_from_url[:60], full_link))
+
+        # Text mit direkten Links aufbauen
+        if product_links:
+            product_list_linked = "\n".join(
+                f"• <a href='{lnk}'>{nm}</a>" for nm, lnk in product_links[:10]
+            )
+            if len(product_links) > 10:
+                product_list_linked += f"\n• <a href='{pc_url}'>... und mehr anzeigen</a>"
+        else:
+            product_list_linked = f"• <a href='{pc_url}'>Alle verfügbaren Produkte anzeigen</a>"
+
         for user_id in all_users:
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=(
                         f"🏪 <b>{pc_name.upper()} – RESTOCK!</b>\n\n"
-                        f"Neue Produkte im offiziellen Shop verfügbar:\n\n"
-                        f"{product_list}\n\n"
-                        f"👉 <a href='{pc_url}'>Jetzt im Pokémon Center kaufen!</a>\n\n"
-                        f"⚡ <i>Schnell sein – Official Store Produkte sind oft limitiert!</i>"
+                        f"Neue Produkte verfügbar – direkt zum Produkt:\n\n"
+                        f"{product_list_linked}\n\n"
+                        f"⚡ <i>Schnell sein – Produkte sind oft schnell ausverkauft!</i>"
                     ),
                     parse_mode="HTML",
-                    disable_web_page_preview=False
+                    disable_web_page_preview=True
                 )
             except Exception as e:
                 print(f"⚠️ Pokémon Center Alert Fehler ({user_id}): {e}")
@@ -4028,7 +4052,7 @@ def main():
     jq.run_repeating(job_deal_alerts,      interval=300,   first=90)   # Deal-Alerts
     jq.run_repeating(job_new_sets,         interval=3600,  first=120)  # Neue Sets
     jq.run_repeating(job_amazon_invite_check,   interval=300, first=20)  # Amazon alle 5 Min
-    jq.run_repeating(job_pokemon_center_check,  interval=180, first=10)  # Pokémon Center alle 3 Min
+    jq.run_repeating(job_pokemon_center_check,  interval=600, first=10)  # Pokémon Center alle 10 Min
 
     # Commands
     app.add_handler(CommandHandler("start",        start))

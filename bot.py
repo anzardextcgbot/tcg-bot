@@ -12,6 +12,7 @@ import hashlib
 from datetime import datetime
 from urllib.parse import urljoin
 from flask import Flask, request as flask_request
+from difflib import SequenceMatcher
 
 from telegram import (
     Update,
@@ -214,6 +215,149 @@ def require_sub(func):
 # ─────────────────────────────────────────
 ALL_SETS: dict = {}
 SETS_LAST_LOADED: str = ""
+
+
+# ─────────────────────────────────────────
+# TCGDEX API – Bessere Kartensuche (EN/DE/JP)
+# ─────────────────────────────────────────
+TCGDEX_API = "https://api.tcgdex.net/v2"
+
+TCGDEX_LANG_MAP = {
+    "jp": "ja", "jpn": "ja", "japanese": "ja",
+    "de": "de", "deutsch": "de", "german": "de",
+    "en": "en", "english": "en",
+}
+
+TCGDEX_SET_ALIASES = {
+    # DE → JP Set-Name für TCGDex
+    "prismatische entwicklungen":    "terastal festival ex",
+    "paldeas schicksale":            "shiny treasure ex",
+    "drachenwandel":                 "evolving skies",
+    "schaurige herrschaft":          "chilling reign",
+    "zenit der könige":              "crown zenith",
+    "stürmische funken":             "surging sparks",
+    "ewige rivalen":                 "the glory of team rocket",
+    "reisegefährten":                "journey together",
+    "zeitliche mächte":              "temporal forces",
+    "maskerade im zwielicht":        "twilight masquerade",
+    "verborgene fabel":              "shrouded fable",
+    "stellarkrone":                  "stellar crown",
+    "paradoxrift":                   "paradox rift",
+    "obsidianflammen":               "obsidian flames",
+    "entwicklungen in paldea":       "paldea evolved",
+    "verlorener ursprung":           "lost origin",
+    "silberne sturmwinde":           "silver tempest",
+    "strahlende sterne":             "brilliant stars",
+    "fusionsangriff":                "fusion strike",
+    "astralglanz":                   "astral radiance",
+    "flammen der finsternis":        "darkness ablaze",
+    "clash der rebellen":            "rebel clash",
+    "farbenschock":                  "vivid voltage",
+    "kampfstile":                    "battle styles",
+    # JP-eigene Namen
+    "terastal festival ex":          "terastal festival ex",
+    "shiny treasure ex":             "shiny treasure ex",
+    "vmax climax":                   "vmax climax",
+    "blue sky stream":               "blue sky stream",
+    "eevee heroes":                  "eevee heroes",
+    "vstar universe":                "vstar universe",
+    "lost abyss":                    "lost abyss",
+    "ruler of the black flame":      "ruler of the black flame",
+    "crimson haze":                  "crimson haze",
+    "night wanderer":                "night wanderer",
+    "battle partners":               "battle partners",
+    "the glory of team rocket":      "the glory of team rocket",
+    "paradise dragona":              "paradise dragona",
+    "151":                           "151",
+    "pokemon card 151":              "151",
+}
+
+def tcgdex_similarity(a: str, b: str) -> float:
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+def tcgdex_detect_language(text: str):
+    parts = text.lower().split()
+    for part in parts:
+        if part in TCGDEX_LANG_MAP:
+            return TCGDEX_LANG_MAP[part], part
+    return "en", None
+
+def tcgdex_detect_set(text: str):
+    text_lower = text.lower()
+    # Exakter Match zuerst
+    for alias, canonical in TCGDEX_SET_ALIASES.items():
+        if alias in text_lower:
+            return canonical
+    # Fuzzy Match
+    best_set = None
+    best_score = 0
+    for alias, canonical in TCGDEX_SET_ALIASES.items():
+        score = tcgdex_similarity(alias, text_lower)
+        if score > best_score:
+            best_set = canonical
+            best_score = score
+    return best_set if best_score >= 0.6 else None
+
+def tcgdex_find_cards(pokemon_name: str, set_name: str = None, language: str = "en") -> list:
+    """Sucht Karten über TCGDex API – unterstützt EN, DE, JP."""
+    try:
+        url = f"{TCGDEX_API}/{language}/cards"
+        resp = requests.get(url, timeout=20, headers={"User-Agent": "AnzarDexBot/1.0"})
+        all_cards = resp.json()
+        if not isinstance(all_cards, list):
+            return []
+
+        results = []
+        for card in all_cards:
+            card_name = (card.get("name") or "").lower()
+            card_set  = ((card.get("set") or {}).get("name") or "").lower()
+
+            # Pokémon-Name muss vorkommen
+            if pokemon_name.lower() not in card_name:
+                continue
+
+            # Set prüfen wenn angegeben
+            if set_name:
+                set_match = (
+                    set_name.lower() in card_set or
+                    tcgdex_similarity(set_name.lower(), card_set) >= 0.6
+                )
+                if not set_match:
+                    continue
+
+            # Vollständige Kartendetails laden
+            card_id = card.get("id", "")
+            try:
+                detail_url = f"{TCGDEX_API}/{language}/cards/{card_id}"
+                detail = requests.get(detail_url, timeout=10).json()
+            except Exception:
+                detail = card
+
+            results.append({
+                "source":  "tcgdex",
+                "id":      card_id,
+                "name":    detail.get("name", card.get("name", "?")),
+                "set":     (detail.get("set") or {}).get("name", "?"),
+                "number":  detail.get("localId", card.get("localId", "?")),
+                "image":   detail.get("image", card.get("image", "")),
+                "lang":    language,
+            })
+            if len(results) >= 8:
+                break
+
+        return results
+    except Exception as e:
+        print(f"⚠️ TCGDex Fehler: {e}")
+        return []
+
+# Amazon Pokémon Store
+AMAZON_POKEMON_STORE = "https://www.amazon.de/stores/Pok%C3%A9mon-Sammelkartenspiel/page/EBE7C18D-29BC-41FA-9252-C03AD4C74D4B"
+
+def get_amazon_search_url(query: str) -> str:
+    """Direkter Amazon Produktlink für Pokémon TCG."""
+    encoded = query.replace(" ", "+")
+    return f"https://www.amazon.de/s?k={encoded}+pokemon+karten&rh=n%3A301128"
+
 
 # Hardcoded Fallback-Sets (alle wichtigen Sets)
 FALLBACK_SETS = {
@@ -572,21 +716,31 @@ def save_price(card_name: str, price: float):
     )
     conn.commit()
 
-def search_pokemon_card(card_name: str, set_name: str = None) -> list:
-    url    = "https://api.pokemontcg.io/v2/cards"
-    query  = f'name:"{card_name}"'
-    if set_name:
-        if "151" in set_name.lower():
-            query += " set.id:sv3pt5"
-        else:
-            query += f' set.name:"{set_name}"'
-    params = {"q": query, "pageSize": 50}
+def search_pokemon_card(card_name: str, set_name: str = None, language: str = "en") -> list:
+    """Sucht Karten – TCGDex primär, PokémonTCG als Fallback."""
+    # 1. Versuch: TCGDex
     try:
-        resp = requests.get(url, params=params, timeout=10)
+        tcgdex_results = tcgdex_find_cards(card_name, set_name, language)
+        if tcgdex_results:
+            return tcgdex_results
+    except Exception as e:
+        print(f"⚠️ TCGDex Fehler: {e}")
+
+    # 2. Fallback: PokémonTCG API
+    try:
+        url   = "https://api.pokemontcg.io/v2/cards"
+        query = f'name:"{card_name}"'
+        if set_name:
+            if "151" in set_name.lower():
+                query += " set.id:sv3pt5"
+            else:
+                query += f' set.name:"{set_name}"'
+        resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=10)
         if resp.status_code == 200:
             return resp.json().get("data", [])
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ PokémonTCG API Fehler: {e}")
+
     return []
 
 def check_restock(url: str):
@@ -1044,25 +1198,30 @@ async def send_card_details(message, card):
     number  = card.get("number", "?")
     rarity  = card.get("rarity", "Unbekannt")
     image   = card.get("images", {}).get("large")
-    cm_data = card.get("cardmarket", {})
-    prices  = cm_data.get("prices", {})
+    # TCGDex oder PokémonTCG API Karte
+    is_tcgdex = card.get("source") == "tcgdex"
 
-    trend = prices.get("trendPrice")
-    low   = prices.get("lowPrice")
-    avg   = prices.get("averageSellPrice")
-
-    # Cardmarket URL – direkt aus API, sauber validiert
-    cm_url = cm_data.get("url", "")
-    if cm_url:
-        if not cm_url.startswith("http"):
-            cm_url = "https://www.cardmarket.com" + cm_url
-        # Sicherstellen dass URL gültig ist
-        if " " in cm_url or not cm_url.startswith("https://"):
-            cm_url = ""
-    if not cm_url:
-        # Fallback: einfache Suche
-        q = f"{name} {set_nm}".replace(" ", "%20")
-        cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
+    if is_tcgdex:
+        # TCGDex Karte
+        low = trend = avg = None
+        img_base = card.get("image", "")
+        image = f"{img_base}/high.png" if img_base and not img_base.endswith(".png") else img_base
+        cm_url = get_cardmarket_card_url(name, set_nm, number if str(number).isdigit() else None)
+    else:
+        cm_data = card.get("cardmarket", {})
+        prices  = cm_data.get("prices", {})
+        trend = prices.get("trendPrice")
+        low   = prices.get("lowPrice")
+        avg   = prices.get("averageSellPrice")
+        cm_url = cm_data.get("url", "")
+        if cm_url:
+            if not cm_url.startswith("http"):
+                cm_url = "https://www.cardmarket.com" + cm_url
+            if " " in cm_url or not cm_url.startswith("https://"):
+                cm_url = ""
+        if not cm_url:
+            q = f"{name} {set_nm}".replace(" ", "%20")
+            cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
 
     preis_zeilen = []
     if low:
@@ -1072,7 +1231,7 @@ async def send_card_details(message, card):
     if avg:
         preis_zeilen.append(f"📊 <b>Ø Verkauf:</b> {avg} €")
     if not preis_zeilen:
-        preis_zeilen.append("💰 Keine Preisdaten verfügbar")
+        preis_zeilen.append("💰 Preis → siehe Cardmarket")
 
     text = (
         f"🃏 <b>{name}</b>\n"
@@ -1108,8 +1267,13 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower().strip()
 
-    # JP-Erkennung: " jp" am Ende, JP-Set-Name oder DE-Set-Name mit "jp"
-    is_jp = query_lower.endswith(" jp") or " jp " in query_lower
+    # Sprache erkennen: jp, de, en
+    detected_lang, lang_token = tcgdex_detect_language(query_lower)
+    if lang_token:
+        query_lower = query_lower.replace(lang_token, "").strip()
+
+    # JP-Erkennung: " jp" am Ende, JP-Set-Name oder DE-Set-Name
+    is_jp = detected_lang == "ja"
     if not is_jp:
         for jp_name in JP_SET_IDS.keys():
             if jp_name in query_lower:
@@ -1158,18 +1322,39 @@ async def _search_card(message, query: str):
             await message.reply_text("❌ Bitte einen Kartennamen angeben.")
             return
 
-        # API-Suche mit Retry
-        url = "https://api.pokemontcg.io/v2/cards"
+        # Suche via TCGDex (unterstützt echte JP-Karten)
         cards = []
-        for attempt_q in [f'name:"{jp_query}"', f"name:{jp_query}"]:
-            full_q = attempt_q + (f" set.id:{matched_set_id}" if matched_set_id else "")
+        # TCGDex Set-Namen ermitteln
+        tcgdex_set = None
+        if matched_set_id:
+            # matched_set_id ist API-ID (sv2a etc.) → TCGDex Set-Name aus TCGDEX_SET_ALIASES
+            for alias, canonical in TCGDEX_SET_ALIASES.items():
+                if alias in jp_query or alias == "151" and "151" in jp_query:
+                    tcgdex_set = canonical
+                    break
+            if not tcgdex_set:
+                # DE-Set-Name direkt als TCGDex-Set nutzen
+                for de_set, jp_set in DE_SET_TO_JP.items():
+                    if de_set in query_lower:
+                        tcgdex_set = TCGDEX_SET_ALIASES.get(de_set, de_set)
+                        break
+
+        # TCGDex JP-Suche
+        cards = tcgdex_find_cards(jp_query, tcgdex_set, "ja")
+
+        # Fallback: TCGDex EN
+        if not cards:
+            cards = tcgdex_find_cards(jp_query, tcgdex_set, "en")
+
+        # Fallback: PokémonTCG API
+        if not cards:
             try:
+                url   = "https://api.pokemontcg.io/v2/cards"
+                full_q = f'name:"{jp_query}"' + (f" set.id:{matched_set_id}" if matched_set_id else "")
                 resp  = requests.get(url, params={"q": full_q, "pageSize": 20}, timeout=15)
                 cards = resp.json().get("data", [])
-                if cards:
-                    break
             except Exception as e:
-                print(f"⚠️ JP API Fehler: {e}")
+                print(f"⚠️ Fallback API Fehler: {e}")
 
         if not cards:
             await message.reply_text(
@@ -1351,17 +1536,27 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Für CM-Link: Original-Query nehmen damit alle Varianten erscheinen
     cm_url = get_cardmarket_de_url(query)
 
+    # Case → Karton für Cardmarket
+    cm_query = query
+    if "case" in query.lower():
+        cm_query = query.lower().replace("case", "karton")
+    cm_url = get_cardmarket_de_url(cm_query)
+
+    # Amazon Produktlink
+    amazon_url = get_amazon_search_url(search_query)
+
     text = (
         f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"🏷 <b>Typ:</b> {product_type}\n\n"
-        f"🛒 Cardmarket zeigt alle Varianten (18er, 36er, Case etc.) sortiert nach Preis.\n"
+        f"🛒 Cardmarket zeigt alle Varianten sortiert nach Preis.\n"
         f"🔔 Aktiviere den Restock-Alert – du wirst sofort benachrichtigt\n"
         f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
     )
 
     keyboard = [
-        [InlineKeyboardButton("🛒 Cardmarket DE – Günstigster Preis", url=cm_url)],
+        [InlineKeyboardButton("🛒 Cardmarket – Alle Varianten", url=cm_url)],
+        [InlineKeyboardButton("📦 Amazon Pokémon Shop", url=amazon_url)],
         [InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")],
     ]
 

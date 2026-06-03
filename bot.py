@@ -817,16 +817,15 @@ def save_price(card_name: str, price: float):
     conn.commit()
 
 def search_pokemon_card(card_name: str, set_name: str = None, language: str = "en") -> list:
-    """Sucht Karten – PokémonTCG primär, TCGDex als Fallback für JP."""
-    # 1. PokémonTCG API (schnell, zuverlässig für EN/DE)
+    """Sucht Karten über PokémonTCG API."""
     try:
         url   = "https://api.pokemontcg.io/v2/cards"
         query = f'name:"{card_name}"'
         if set_name:
             if "151" in set_name.lower():
                 query += " set.id:sv3pt5"
-            elif set_name in ALL_SETS:
-                query += f" set.id:{ALL_SETS[set_name]}"
+            elif set_name.lower() in ALL_SETS:
+                query += f" set.id:{ALL_SETS[set_name.lower()]}"
             else:
                 query += f' set.name:"{set_name}"'
         resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=15)
@@ -837,7 +836,7 @@ def search_pokemon_card(card_name: str, set_name: str = None, language: str = "e
     except Exception as e:
         print(f"⚠️ PokémonTCG API Fehler: {e}")
 
-    # 2. Fallback: ohne Anführungszeichen
+    # Fallback ohne Anführungszeichen
     try:
         url   = "https://api.pokemontcg.io/v2/cards"
         query = f"name:{card_name}"
@@ -845,18 +844,9 @@ def search_pokemon_card(card_name: str, set_name: str = None, language: str = "e
             query += f' set.name:"{set_name}"'
         resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=15)
         if resp.status_code == 200:
-            results = resp.json().get("data", [])
-            if results:
-                return results
+            return resp.json().get("data", [])
     except Exception as e:
-        print(f"⚠️ PokémonTCG API Fallback Fehler: {e}")
-
-    # 3. TCGDex als letzter Fallback (JP-Karten)
-    if language == "ja":
-        try:
-            return tcgdex_find_cards(card_name, set_name, language)
-        except Exception as e:
-            print(f"⚠️ TCGDex Fehler: {e}")
+        print(f"⚠️ PokémonTCG Fallback Fehler: {e}")
 
     return []
 
@@ -1384,21 +1374,24 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower().strip()
 
-    # Sprache erkennen: jp, de, en
-    detected_lang, lang_token = tcgdex_detect_language(query_lower)
-    if lang_token:
-        query_lower = query_lower.replace(lang_token, "").strip()
-
-    # JP-Erkennung: " jp" am Ende, JP-Set-Name oder DE-Set-Name
-    is_jp = detected_lang == "ja"
+    # JP-Erkennung: NUR wenn explizit "jp" geschrieben wird
+    is_jp = (
+        query_lower.endswith(" jp") or
+        " jp " in query_lower or
+        query_lower.startswith("jp ")
+    )
+    # Oder wenn ein echter JP-exklusiver Set-Name vorkommt
     if not is_jp:
-        for jp_name in JP_SET_IDS.keys():
+        jp_only_sets = [
+            "shiny treasure", "vmax climax", "eevee heroes", "vstar universe",
+            "blue sky stream", "lost abyss", "dark phantasma", "vmax climax",
+            "ruler of the black flame", "terastal festival", "paradise dragona",
+            "night wanderer", "battle partners", "crimson haze", "triplet beat",
+            "clay burst", "snow hazard", "ancient roar", "future flash",
+            "wild force", "cyber judge", "incandescent arcana",
+        ]
+        for jp_name in jp_only_sets:
             if jp_name in query_lower:
-                is_jp = True
-                break
-    if not is_jp:
-        for de_set in DE_SET_TO_JP.keys():
-            if de_set in query_lower:
                 is_jp = True
                 break
     if is_jp:
@@ -1674,8 +1667,7 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"🏷 <b>Typ:</b> {product_type}\n\n"
-        f"🛒 Cardmarket nennt Cases manchmal \"Case\" und manchmal \"Karton\" –\n"
-        f"daher zwei Links für dich.\n\n"
+        f"🛒 Cardmarket zeigt alle Varianten sortiert nach Preis.\n"
         f"🔔 Aktiviere den Restock-Alert – du wirst sofort benachrichtigt\n"
         f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
     )

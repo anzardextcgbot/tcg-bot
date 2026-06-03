@@ -40,7 +40,7 @@ BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
 STRIPE_TOKEN          = os.getenv("STRIPE_TOKEN", "")        # Telegram Payments Token von @BotFather
 STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")   # sk_live_... aus Stripe Dashboard
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "") # whsec_... aus Stripe Webhook
-MONTHLY_PRICE    = 499   # Preis in Cent = 4,99€
+MONTHLY_PRICE    = 499   # Preis in Cent = 6,99€
 CURRENCY         = "EUR"
 ADMIN_ID         = os.getenv("ADMIN_ID", "")          # Deine Telegram-ID für Admin-Befehle
 MONTHLY_PRICE    = 499                                 # Preis in Cent → 4,99 €
@@ -3024,8 +3024,7 @@ async def job_restock_check(context: ContextTypes.DEFAULT_TYPE):
                     f"🚨 <b>RESTOCK!</b> 🚨\n\n"
                     f"📦 <b>{product_query.upper()}</b>\n"
                     f"🏪 <b>{shop_name}</b>\n\n"
-                    f"🛒 <a href='{product_url}'>Direkt zum Produkt</a>\n"
-                    f"💳 <a href='{cm_url}'>Cardmarket DE</a>\n\n"
+                    f"🛒 <a href='{product_url}'>Direkt zum Produkt →</a>\n\n"
                     f"⚡ <i>Schnell sein!</i>"
                 )
                 alert_keyboard = InlineKeyboardMarkup([
@@ -3475,7 +3474,10 @@ async def admin_adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         (target_id, "", "active", "monthly", now.isoformat(), expires.isoformat())
     )
     conn.commit()
-    await update.message.reply_text(f"✅ User {target_id} freigeschaltet bis {expires.strftime('%d.%m.%Y')}")
+    await update.message.reply_text(
+        f"✅ User {target_id} freigeschaltet bis {expires.strftime('%d.%m.%Y')}\n"
+        f"💰 Manuell aktiviert"
+    )
     try:
         await context.bot.send_message(
             chat_id=target_id,
@@ -3556,24 +3558,49 @@ def activate_subscription(user_id: str, username: str = ""):
     conn.commit()
     print(f"✅ Abo aktiviert für User {user_id} bis {expires.strftime('%d.%m.%Y')}")
 
-    # Telegram-Nachricht senden
+    # Telegram-Nachrichten senden
     if telegram_app_ref:
         async def send_msg():
             try:
+                # User benachrichtigen
                 await telegram_app_ref.bot.send_message(
                     chat_id=user_id,
                     text=(
                         "🎉 <b>Zahlung bestätigt! Willkommen bei AnzarDexBot Premium!</b>\n\n"
                         "✅ Restock-Alerts aktiv\n"
                         "✅ Preisalarme aktiv\n"
-                        "✅ Alle Sets EN/DE/JP\n\n"
+                        "✅ Alle Sets DE & EN\n\n"
                         f"Gültig bis: <b>{expires.strftime('%d.%m.%Y')}</b>\n\n"
                         "Tippe /start um loszulegen! 🚀"
                     ),
                     parse_mode="HTML"
                 )
             except Exception as e:
-                print(f"⚠️ Telegram-Nachricht fehlgeschlagen: {e}")
+                print(f"⚠️ User-Nachricht fehlgeschlagen: {e}")
+
+            # Admin benachrichtigen
+            if ADMIN_ID and str(user_id) != str(ADMIN_ID):
+                try:
+                    cursor.execute(
+                        "SELECT username FROM subscriptions WHERE user_id=?", (user_id,)
+                    )
+                    row      = cursor.fetchone()
+                    username = f"@{row[0]}" if row and row[0] else f"ID: {user_id}"
+                    await telegram_app_ref.bot.send_message(
+                        chat_id=ADMIN_ID,
+                        text=(
+                            f"💰 <b>NEUES ABO!</b>\n\n"
+                            f"👤 User: {username}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"📅 Gültig bis: {expires.strftime('%d.%m.%Y')}\n"
+                            f"💳 Preis: 4,99 €/Monat\n\n"
+                            f"/admin – Alle Statistiken anzeigen"
+                        ),
+                        parse_mode="HTML"
+                    )
+                except Exception as e:
+                    print(f"⚠️ Admin-Nachricht fehlgeschlagen: {e}")
+
         asyncio.run_coroutine_threadsafe(send_msg(), telegram_app_ref.update_queue._loop)
 
 def deactivate_subscription(user_id: str):

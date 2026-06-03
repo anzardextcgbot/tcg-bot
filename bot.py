@@ -40,10 +40,10 @@ BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
 STRIPE_TOKEN          = os.getenv("STRIPE_TOKEN", "")        # Telegram Payments Token von @BotFather
 STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")   # sk_live_... aus Stripe Dashboard
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "") # whsec_... aus Stripe Webhook
-MONTHLY_PRICE    = 699   # Preis in Cent = 6,99€
+MONTHLY_PRICE    = 499   # Preis in Cent = 6,99€
 CURRENCY         = "EUR"
 ADMIN_ID         = os.getenv("ADMIN_ID", "")          # Deine Telegram-ID für Admin-Befehle
-MONTHLY_PRICE    = 699                                 # Preis in Cent → 6,99 €
+MONTHLY_PRICE    = 499                                 # Preis in Cent → 4,99 €
 
 last_search_results = {}
 
@@ -178,6 +178,9 @@ init_db()
 # SUBSCRIPTION HELPERS
 # ─────────────────────────────────────────
 def is_subscribed(user_id: str) -> bool:
+    # Admin hat immer vollen Zugang
+    if str(user_id) == str(ADMIN_ID):
+        return True
     cursor.execute(
         "SELECT status, expires_at FROM subscriptions WHERE user_id = ?",
         (user_id,)
@@ -444,19 +447,67 @@ def check_amazon_invite(asin: str) -> tuple:
 
 # Bekannte Pokémon TCG Produkte auf Amazon mit ASIN
 # Diese werden automatisch überwacht
+# Bekannte Pokémon TCG Produkte auf Amazon – werden automatisch überwacht
+# Neue Produkte werden automatisch beim Amazon-Pokémon-Store-Scan gefunden
 KNOWN_AMAZON_PRODUCTS = {
+    # ── Scarlet & Violet ──────────────────────────────────
     "B0DGY2S5N1": "Prismatische Entwicklungen ETB",
-    "B0BLQWM9TW": "Karmesin & Purpur ETB",
-    "B0CQJWQK3Q": "Paldeas Schicksale ETB",
-    "B0D3GQKRPB": "Paradoxrift ETB",
-    "B0CK7BTXZZ": "Obsidianflammen ETB",
-    "B0CMTF8MKV": "Zeitliche Mächte ETB",
-    "B0D7Y9MXNW": "Maskerade im Zwielicht ETB",
-    "B0DCNDJQ7P": "Verborgene Fabel ETB",
-    "B0DGZDV9VG": "Stellarkrone ETB",
     "B0DM3FKRVW": "Stürmische Funken ETB",
     "B0DQWL2YMX": "Ewige Rivalen ETB",
+    "B0DGZDV9VG": "Stellarkrone ETB",
+    "B0DCNDJQ7P": "Verborgene Fabel ETB",
+    "B0D7Y9MXNW": "Maskerade im Zwielicht ETB",
+    "B0CMTF8MKV": "Zeitliche Mächte ETB",
+    "B0D3GQKRPB": "Paradoxrift ETB",
+    "B0CQJWQK3Q": "Paldeas Schicksale ETB",
+    "B0CK7BTXZZ": "Obsidianflammen ETB",
+    "B0BLQWM9TW": "Karmesin & Purpur ETB",
+    # Displays
+    "B0DGY2S5N2": "Stürmische Funken Display",
+    "B0DQWL2YMZ": "Ewige Rivalen Display",
+    "B0DGZDV9VH": "Stellarkrone Display",
+    # UPC / Premium
+    "B0DGY1S5N1": "Prismatische Entwicklungen UPC",
+    "B0DM3FKRV1": "Stürmische Funken UPC",
+    # ── Sword & Shield ────────────────────────────────────
+    "B09FJQWVQM": "Drachenwandel ETB",
+    "B09NWS4XLF": "Strahlende Sterne ETB",
+    "B09XKBPQ8Z": "Astralglanz ETB",
+    "B0B8KJTFNL": "Verlorener Ursprung ETB",
+    "B0BHTCPXZ3": "Silberne Sturmwinde ETB",
+    "B0BXK3NQPF": "Zenit der Könige ETB",
 }
+
+def discover_amazon_products_from_store() -> dict:
+    """
+    Scannt den offiziellen Amazon Pokémon Store nach neuen Produkten.
+    Gibt {asin: product_name} zurück.
+    """
+    discovered = {}
+    store_pages = [
+        "https://www.amazon.de/stores/Pok%C3%A9mon-Sammelkartenspiel/page/EBE7C18D-29BC-41FA-9252-C03AD4C74D4B",
+        "https://www.amazon.de/s?k=pokemon+karten+elite+trainer+box&rh=n%3A301128&s=date-desc-rank",
+        "https://www.amazon.de/s?k=pokemon+karten+display&rh=n%3A301128&s=date-desc-rank",
+        "https://www.amazon.de/s?k=pokemon+karten+booster&rh=n%3A301128&s=date-desc-rank",
+    ]
+    for url in store_pages:
+        try:
+            resp = requests.get(url, timeout=15, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept-Language": "de-DE,de;q=0.9",
+            })
+            html = resp.text
+            # ASIN aus Links extrahieren
+            asins = re.findall(r"/dp/([A-Z0-9]{10})", html)
+            # Produktnamen aus Titeln
+            titles = re.findall(r"Pokémon[^<]{5,80}(?:ETB|Display|Booster|Collection|Tin|Bundle|UPC)", html, re.IGNORECASE)
+            for i, asin in enumerate(set(asins)):
+                if asin not in KNOWN_AMAZON_PRODUCTS and asin not in discovered:
+                    name = titles[i].strip() if i < len(titles) else f"Pokémon TCG Produkt ({asin})"
+                    discovered[asin] = name[:60]
+        except Exception as e:
+            print(f"⚠️ Amazon Store Scan Fehler: {e}")
+    return discovered
 
 
 # Hardcoded Fallback-Sets (alle wichtigen Sets)
@@ -1647,35 +1698,38 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query       = " ".join(context.args) if context.args else update.message.text
     query_lower = query.lower()
 
+    # Produkttyp erkennen
     product_type = "Produkt"
+    is_case      = False
     for kw, pname in PRODUCT_TYPES.items():
         if kw in query_lower:
             product_type = pname
+            if kw == "case":
+                is_case = True
             break
 
     search_query = normalize_product_query(query)
-    # Für CM-Link: Original-Query nehmen damit alle Varianten erscheinen
-    cm_url = get_cardmarket_de_url(query)
 
-    cm_url_case   = get_cardmarket_de_url(query)
-    # Zweite Suche mit "karton" statt "case" (CM ist inkonsistent)
-    query_karton  = re.sub(r"\bcase\b", "karton", query.lower())
-    cm_url_karton = get_cardmarket_de_url(query_karton) if query_karton != query.lower() else None
+    # Cardmarket URL – direkt mit dem was der User geschrieben hat
+    cm_url_main = get_cardmarket_de_url(query)
+
+    # Nur bei "case": zweiten Link mit "karton" generieren
+    cm_url_karton = None
+    if is_case:
+        query_karton  = re.sub(r"\bcase\b", "karton", query_lower)
+        cm_url_karton = get_cardmarket_de_url(query_karton)
 
     text = (
         f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"🏷 <b>Typ:</b> {product_type}\n\n"
         f"🛒 Cardmarket zeigt alle Varianten sortiert nach Preis.\n"
-        f"🔔 Aktiviere den Restock-Alert – du wirst sofort benachrichtigt\n"
-        f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
+        f"🔔 Restock-Alert aktivieren – sofort benachrichtigt wenn wieder verfügbar,\n"
+        f"<b>inklusive direktem Shop-Link.</b>"
     )
 
-    # Ein Link – nimmt "case" weil Cardmarket das meist findet
-    # Wenn nicht gefunden, User kann manuell "karton" tippen
-    # Karton-Link nur wenn "case" im Query
     keyboard = [
-        [InlineKeyboardButton("🛒 Cardmarket – als Case", url=cm_url_case)],
+        [InlineKeyboardButton("🛒 Cardmarket – Alle Varianten", url=cm_url_main)],
     ]
     if cm_url_karton:
         keyboard.append([InlineKeyboardButton("🛒 Cardmarket – als Karton", url=cm_url_karton)])
@@ -3644,16 +3698,43 @@ async def job_new_sets(context: ContextTypes.DEFAULT_TYPE):
 
 async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
     """
-    Prüft alle bekannten Amazon-Produkte auf Einladungen.
-    Benachrichtigt alle Premium-User automatisch.
+    1. Scannt Amazon Store nach neuen Produkten
+    2. Prüft alle Produkte auf Verfügbarkeit / Einladung
+    3. Benachrichtigt nur wenn verfügbar – kein Alert wenn ausverkauft
     """
-    # Alle Premium-User holen
-    cursor.execute("SELECT user_id FROM subscriptions WHERE status='active'")
-    all_users = [r[0] for r in cursor.fetchall()]
+    # Admin immer benachrichtigen, Plus alle aktiven Abonnenten
+    cursor.execute(
+        "SELECT user_id FROM subscriptions WHERE status='active' "
+        "UNION SELECT ? WHERE ? != ''",
+        (ADMIN_ID, ADMIN_ID)
+    )
+    all_users = list({r[0] for r in cursor.fetchall()})
     if not all_users:
         return
 
-    for asin, product_name in KNOWN_AMAZON_PRODUCTS.items():
+    # Neue Produkte vom Amazon Store entdecken
+    try:
+        new_products = discover_amazon_products_from_store()
+        for asin, name in new_products.items():
+            cursor.execute(
+                "INSERT OR IGNORE INTO amazon_products (asin, product_name, amazon_url, last_status, added_at) "
+                "VALUES (?,?,?,'unknown',?)",
+                (asin, name, get_amazon_product_url(asin), datetime.now().isoformat())
+            )
+        conn.commit()
+        if new_products:
+            print(f"🆕 {len(new_products)} neue Amazon-Produkte entdeckt")
+    except Exception as e:
+        print(f"⚠️ Amazon Discovery Fehler: {e}")
+
+    # Alle zu checkenden Produkte = bekannte + neu entdeckte
+    all_products = dict(KNOWN_AMAZON_PRODUCTS)
+    cursor.execute("SELECT asin, product_name FROM amazon_products")
+    for asin, name in cursor.fetchall():
+        if asin not in all_products:
+            all_products[asin] = name
+
+    for asin, product_name in all_products.items():
         try:
             status, url = check_amazon_invite(asin)
 
@@ -3683,11 +3764,12 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
             if old_status == status:
                 continue
 
-            emoji = "🎟" if status == "invite" else "🛒"
+            emoji       = "🎟" if status == "invite" else "🛒"
             status_text = "EINLADUNG VERFÜGBAR" if status == "invite" else "WIEDER VERFÜGBAR"
+            btn_text    = "🎟 Einladungs-Link:" if status == "invite" else "🛒 Jetzt kaufen:"
 
             for user_id in all_users:
-                # Schon benachrichtigt?
+                # Schon benachrichtigt für diesen Status?
                 cursor.execute(
                     "SELECT 1 FROM amazon_invite_alerts WHERE asin=? AND user_id=?",
                     (asin, user_id)
@@ -3701,21 +3783,20 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
                         text=(
                             f"{emoji} <b>AMAZON {status_text}!</b>\n\n"
                             f"📦 <b>{product_name}</b>\n\n"
-                            f"{'🎟 Einladungs-Link direkt:' if status == 'invite' else '🛒 Jetzt kaufen:'}\n"
-                            f"{url}\n\n"
-                            f"⚡ <i>Schnell sein – diese Einladungen sind oft nur kurz verfügbar!</i>"
+                            f"{btn_text}\n"
+                            f"<a href='{url}'>{url}</a>\n\n"
+                            f"⚡ <i>Schnell sein – oft nur kurz verfügbar!</i>"
                         ),
                         parse_mode="HTML",
                         disable_web_page_preview=True
                     )
-                    # Alert als gesendet markieren
                     cursor.execute(
                         "INSERT OR IGNORE INTO amazon_invite_alerts (asin, user_id, sent_at) VALUES (?,?,?)",
                         (asin, user_id, datetime.now().isoformat())
                     )
                     conn.commit()
                 except Exception as e:
-                    print(f"⚠️ Amazon Alert senden Fehler ({user_id}): {e}")
+                    print(f"⚠️ Amazon Alert Fehler ({user_id}): {e}")
 
         except Exception as e:
             print(f"⚠️ Amazon Job Fehler ({asin}): {e}")

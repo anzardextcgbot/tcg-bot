@@ -1833,7 +1833,11 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ultra premium", "kollektion", "display", "tin", "case",
         "elite trainer", "bundle", "booster"
     ]
-    is_product = any(kw in text_lower for kw in PRODUCT_KEYWORDS + DE_PRODUCT_KEYWORDS)
+
+    is_product = any(
+         re.search(rf"\b{re.escape(kw)}\b", text_lower)
+         for kw in PRODUCT_KEYWORDS + DE_PRODUCT_KEYWORDS
+    )
     context.args = text.split()
 
     if is_product:

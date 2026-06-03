@@ -1479,6 +1479,12 @@ async def _search_card(message, query: str):
                 parse_mode="HTML"
             )
             return
+        # Sicherstellen dass alle Karten Dicts sind (kein String-Müll)
+        cards = [c for c in cards if isinstance(c, dict)]
+        if not cards:
+            await message.reply_text(f"❌ Keine Karte gefunden für: {jp_query}")
+            return
+
         user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
         last_search_results[user_id] = cards[:8]
         try:
@@ -1497,12 +1503,13 @@ async def _search_card(message, query: str):
             return
         keyboard = []
         for idx, card in enumerate(cards[:8], 1):
-            prices = card.get("cardmarket", {}).get("prices", {})
-            trend  = prices.get("trendPrice", "?")
-            set_nm = card.get("set", {}).get("name", "?")
-            num    = card.get("number", "?")
+            prices = card.get("cardmarket", {}).get("prices", {}) if isinstance(card.get("cardmarket"), dict) else {}
+            trend  = prices.get("trendPrice", "–")
+            set_obj = card.get("set", {})
+            set_nm = set_obj.get("name", "?") if isinstance(set_obj, dict) else str(set_obj)
+            num    = card.get("number", card.get("localId", "?"))
             keyboard.append([InlineKeyboardButton(
-                f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
+                f"{idx}. {card.get('name','?')} | {set_nm} | #{num}" + (f" | {trend}€" if trend != "–" else ""),
                 callback_data=f"sel_{user_id}_{idx}"
             )])
         await message.reply_text(
@@ -1550,11 +1557,13 @@ async def _search_card(message, query: str):
     cards = search_pokemon_card(card_name, matched_set)
 
     # Scoring – richtiges Set bevorzugen, JP-Karten raus
+    # Nur echte Dict-Karten verarbeiten
+    cards = [c for c in cards if isinstance(c, dict)]
     scored = []
     for card in cards:
         set_obj  = card.get("set", {})
-        set_name = set_obj.get("name", "").lower()
-        set_id   = set_obj.get("id", "").lower()
+        set_name = set_obj.get("name", "").lower() if isinstance(set_obj, dict) else ""
+        set_id   = set_obj.get("id", "").lower() if isinstance(set_obj, dict) else ""
         c_name   = card.get("name", "").lower()
         number   = card.get("number", "")
         score    = 0
@@ -1619,16 +1628,19 @@ async def _search_card(message, query: str):
 
     keyboard = []
     for idx, card in enumerate(cards, 1):
-        prices = card.get("cardmarket", {}).get("prices", {})
-        trend  = prices.get("trendPrice", "?")
-        set_nm = card.get("set", {}).get("name", "?")
-        num    = card.get("number", "?")
-        # User-ID im callback_data damit button_select immer den richtigen Cache trifft
+        if not isinstance(card, dict):
+            continue
+        cm   = card.get("cardmarket", {})
+        prices = cm.get("prices", {}) if isinstance(cm, dict) else {}
+        trend  = prices.get("trendPrice", "–") if isinstance(prices, dict) else "–"
+        set_obj = card.get("set", {})
+        set_nm  = set_obj.get("name", "?") if isinstance(set_obj, dict) else str(set_obj)
+        num     = card.get("number", card.get("localId", "?"))
         callback = f"sel_{user_id}_{idx}"
-        keyboard.append([InlineKeyboardButton(
-            f"{idx}. {card.get('name')} | {set_nm} | #{num} | {trend}€",
-            callback_data=callback
-        )])
+        label = f"{idx}. {card.get('name','?')} | {set_nm} | #{num}"
+        if trend != "–":
+            label += f" | {trend}€"
+        keyboard.append([InlineKeyboardButton(label, callback_data=callback)])
 
     await message.reply_text(
         f"🔍 Ergebnisse für: <b>{query}</b>",
@@ -1668,12 +1680,12 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
     )
 
+    # Ein Link – nimmt "case" weil Cardmarket das meist findet
+    # Wenn nicht gefunden, User kann manuell "karton" tippen
     keyboard = [
-        [InlineKeyboardButton("🛒 Cardmarket – als \"Case\"", url=cm_url_case)],
+        [InlineKeyboardButton("🛒 Cardmarket – Alle Varianten", url=cm_url_case)],
+        [InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")],
     ]
-    if cm_url_karton:
-        keyboard.append([InlineKeyboardButton("🛒 Cardmarket – als \"Karton\"", url=cm_url_karton)])
-    keyboard.append([InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")])
 
     await update.message.reply_text(
         text, parse_mode="HTML",

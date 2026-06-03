@@ -447,36 +447,11 @@ def check_amazon_invite(asin: str) -> tuple:
 
 # Bekannte Pokémon TCG Produkte auf Amazon mit ASIN
 # Diese werden automatisch überwacht
-# Bekannte Pokémon TCG Produkte auf Amazon – werden automatisch überwacht
-# Neue Produkte werden automatisch beim Amazon-Pokémon-Store-Scan gefunden
-KNOWN_AMAZON_PRODUCTS = {
-    # ── Scarlet & Violet ──────────────────────────────────
-    "B0DGY2S5N1": "Prismatische Entwicklungen ETB",
-    "B0DM3FKRVW": "Stürmische Funken ETB",
-    "B0DQWL2YMX": "Ewige Rivalen ETB",
-    "B0DGZDV9VG": "Stellarkrone ETB",
-    "B0DCNDJQ7P": "Verborgene Fabel ETB",
-    "B0D7Y9MXNW": "Maskerade im Zwielicht ETB",
-    "B0CMTF8MKV": "Zeitliche Mächte ETB",
-    "B0D3GQKRPB": "Paradoxrift ETB",
-    "B0CQJWQK3Q": "Paldeas Schicksale ETB",
-    "B0CK7BTXZZ": "Obsidianflammen ETB",
-    "B0BLQWM9TW": "Karmesin & Purpur ETB",
-    # Displays
-    "B0DGY2S5N2": "Stürmische Funken Display",
-    "B0DQWL2YMZ": "Ewige Rivalen Display",
-    "B0DGZDV9VH": "Stellarkrone Display",
-    # UPC / Premium
-    "B0DGY1S5N1": "Prismatische Entwicklungen UPC",
-    "B0DM3FKRV1": "Stürmische Funken UPC",
-    # ── Sword & Shield ────────────────────────────────────
-    "B09FJQWVQM": "Drachenwandel ETB",
-    "B09NWS4XLF": "Strahlende Sterne ETB",
-    "B09XKBPQ8Z": "Astralglanz ETB",
-    "B0B8KJTFNL": "Verlorener Ursprung ETB",
-    "B0BHTCPXZ3": "Silberne Sturmwinde ETB",
-    "B0BXK3NQPF": "Zenit der Könige ETB",
-}
+# Bekannte Pokémon TCG Produkte auf Amazon
+# NUR verifizierte ASINs – neue werden automatisch vom Store-Scan gefunden
+KNOWN_AMAZON_PRODUCTS = {}
+# ASINs werden ausschließlich automatisch vom Amazon Store gescannt
+# damit keine falschen Produkte gemeldet werden
 
 def discover_amazon_products_from_store() -> dict:
     """
@@ -3102,24 +3077,37 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ═════════════════════════════════════════════════════════
 @require_sub
 async def setpreisziel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Benutze: /preisziel Charizard ex 50"""
+    """Benutze: /preisziel KARTENNAME | SET | PREIS"""
     if len(context.args) < 2:
         await update.message.reply_text(
             "🎯 <b>Preisziel setzen</b>\n\n"
-            "Benutze: /preisziel KARTENNAME PREIS\n\n"
+            "Benutze: /preisziel KARTENNAME | SET | PREIS\n\n"
             "Beispiele:\n"
-            "/preisziel Charizard ex 50\n"
-            "/preisziel Umbreon VMAX 30\n\n"
-            "Du wirst benachrichtigt wenn der Preis diesen Wert unterschreitet.",
+            "<code>/preisziel Charizard ex | 151 | 50</code>\n"
+            "<code>/preisziel Umbreon VMAX | Evolving Skies | 30</code>\n\n"
+            "💡 Tipp: Suche die Karte und drücke 🎯 – dann wird sie automatisch erkannt!",
             parse_mode="HTML"
         )
         return
-    try:
-        target = float(context.args[-1].replace(",", "."))
-        card_name = " ".join(context.args[:-1])
-    except ValueError:
-        await update.message.reply_text("❌ Bitte einen Preis angeben, z.B. /preisziel Charizard ex 50")
-        return
+    full  = " ".join(context.args)
+    parts = [p.strip() for p in full.split("|")]
+    set_name = ""
+    if len(parts) >= 3:
+        card_name = parts[0]
+        set_name  = parts[1]
+        try: target = float(parts[2].replace(',', '.'))
+        except: await update.message.reply_text('❌ Preis ungültig. Beispiel: /preisziel Charizard ex | 151 | 50'); return
+    elif len(parts) == 2:
+        card_name = parts[0]
+        try: target = float(parts[1].replace(',', '.'))
+        except: await update.message.reply_text('❌ Bitte auch Preis angeben: /preisziel Charizard ex | 151 | 50'); return
+    else:
+        try:
+            target    = float(context.args[-1].replace(',', '.'))
+            card_name = " ".join(context.args[:-1])
+        except ValueError:
+            await update.message.reply_text('❌ Beispiel: /preisziel Charizard ex | 151 | 50')
+            return
 
     user_id = str(update.effective_user.id)
     now = datetime.now().isoformat()
@@ -3197,14 +3185,29 @@ async def setdeal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         return
-    try:
-        pct = int(context.args[-1])
-        card_name = " ".join(context.args[:-1]) if len(context.args) > 1 else context.args[0]
-        if not card_name or pct < 1:
-            raise ValueError
-    except ValueError:
-        pct = 15
-        card_name = " ".join(context.args)
+    full  = " ".join(context.args)
+    parts = [p.strip() for p in full.split("|")]
+    pct   = 15
+    if len(parts) >= 3:
+        card_name = parts[0]
+        set_name  = parts[1]
+        try: pct = int(parts[2])
+        except: pct = 15
+    elif len(parts) == 2:
+        card_name = parts[0]
+        try:
+            pct      = int(parts[1])
+            set_name = ""
+        except:
+            set_name  = parts[1]
+    else:
+        try:
+            pct       = int(context.args[-1])
+            card_name = " ".join(context.args[:-1])
+            set_name  = ""
+        except:
+            card_name = full
+            set_name  = ""
 
     user_id = str(update.effective_user.id)
     cursor.execute(
@@ -3766,12 +3769,10 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
             if old_status == status:
                 continue
 
-            emoji       = "🎟" if status == "invite" else "🛒"
-            status_text = "EINLADUNG VERFÜGBAR" if status == "invite" else "WIEDER VERFÜGBAR"
-            btn_text    = "🎟 Einladungs-Link:" if status == "invite" else "🛒 Jetzt kaufen:"
+            # Nur bei Einladung oder Verfügbarkeit benachrichtigen
+            AMAZON_INVITE_LINK = "https://amzn.to/4srY4S3"
 
             for user_id in all_users:
-                # Schon benachrichtigt für diesen Status?
                 cursor.execute(
                     "SELECT 1 FROM amazon_invite_alerts WHERE asin=? AND user_id=?",
                     (asin, user_id)
@@ -3783,14 +3784,13 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=user_id,
                         text=(
-                            f"{emoji} <b>AMAZON {status_text}!</b>\n\n"
+                            f"🎟 <b>EINLADUNGEN SIND RAUS!</b>\n\n"
                             f"📦 <b>{product_name}</b>\n\n"
-                            f"{btn_text}\n"
-                            f"<a href='{url}'>{url}</a>\n\n"
-                            f"⚡ <i>Schnell sein – oft nur kurz verfügbar!</i>"
+                            f"👉 <a href='{AMAZON_INVITE_LINK}'>Jetzt Einladung sichern!</a>\n\n"
+                            f"⚡ <i>Schnell sein – Einladungen sind oft nur kurz verfügbar!</i>"
                         ),
                         parse_mode="HTML",
-                        disable_web_page_preview=True
+                        disable_web_page_preview=False
                     )
                     cursor.execute(
                         "INSERT OR IGNORE INTO amazon_invite_alerts (asin, user_id, sent_at) VALUES (?,?,?)",

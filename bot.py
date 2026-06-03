@@ -1700,23 +1700,25 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Produkttyp erkennen
     product_type = "Produkt"
-    is_case      = False
     for kw, pname in PRODUCT_TYPES.items():
         if kw in query_lower:
             product_type = pname
-            if kw == "case":
-                is_case = True
             break
+
+    # Case-Erkennung direkt im Query – unabhängig vom Produkttyp-Loop
+    is_case = "case" in query_lower or "karton" in query_lower
 
     search_query = normalize_product_query(query)
 
     # Cardmarket URL – direkt mit dem was der User geschrieben hat
     cm_url_main = get_cardmarket_de_url(query)
 
-    # Nur bei "case": zweiten Link mit "karton" generieren
+    # Bei "case": zweiten Link mit "karton" generieren und umgekehrt
     cm_url_karton = None
     if is_case:
         query_karton  = re.sub(r"\bcase\b", "karton", query_lower)
+        if query_karton == query_lower:  # "karton" war schon drin
+            query_karton = query_lower.replace("karton", "case")
         cm_url_karton = get_cardmarket_de_url(query_karton)
 
     text = (

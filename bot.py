@@ -719,13 +719,8 @@ SET_ALIASES = {
     "rising chaos":               "scarlet & violet",
 }
 
-JP_SET_ALIASES = {
-    "151 jp", "shiny treasure", "shiny treasure ex",
-    "vstar universe", "terastal festival", "terastal festival ex",
-    "battle partners", "night wanderer", "ruler of the black flame",
-    "super electric breaker", "crimson haze", "mask of change",
-    "wild force", "cyber judge", "clay burst", "snow hazard",
-}
+JP_SET_ALIASES = {}
+
 
 PRODUCT_TYPES = {
     "etb": "Elite Trainer Box",
@@ -849,10 +844,13 @@ def search_pokemon_card(card_name: str, set_name: str = None, language: str = "e
         url   = "https://api.pokemontcg.io/v2/cards"
         query = f'name:"{card_name}"'
         if set_name:
-            if "151" in set_name.lower():
+            set_lower = set_name.lower()
+            if "151" in set_lower and "scarlet" not in set_lower:
                 query += " set.id:sv3pt5"
-            elif set_name.lower() in ALL_SETS:
-                query += f" set.id:{ALL_SETS[set_name.lower()]}"
+            elif set_lower in ALL_SETS:
+                query += f" set.id:{ALL_SETS[set_lower]}"
+            elif set_lower in FALLBACK_SETS:
+                query += f" set.id:{FALLBACK_SETS[set_lower]}"
             else:
                 query += f' set.name:"{set_name}"'
         resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=15)
@@ -1099,10 +1097,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🃏 <b>AnzarDexBot</b>\n\n"
         f"Dein persönlicher Pokémon TCG Tracker 🔥\n\n"
         f"Status: {sub_text}\n\n"
+        f"ℹ️ <b>Dieser Bot unterstützt ausschließlich\n"
+        f"deutsche 🇩🇪 und englische 🇬🇧 Karten & Sets.</b>\n\n"
         f"<b>Schnellstart:</b>\n"
         f"• Karte suchen: <code>charizard 151</code>\n"
+        f"• Auf Deutsch: <code>glurak 151</code>\n"
         f"• Produkt suchen: <code>151 etb</code>\n"
-        f"• JP-Karte: <code>charizard 151 jp</code>\n"
         f"• Alle Befehle: /hilfe\n\n"
         f"<i>Restock-Alerts, Preisziele, Portfolio & mehr mit Premium 🔒</i>",
         parse_mode="HTML",
@@ -1417,10 +1417,9 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower().strip()
 
-    # JP-Suche deaktiviert – immer normale EN/DE Suche
+    # Nur DE und EN – JP deaktiviert
     is_jp = False
-    # "jp" aus dem Query entfernen damit die Suche nicht gestört wird
-    query_lower = query_lower.replace(" jp", "").strip()
+    query_lower = query_lower.replace(" jp", "").replace("jp ", "").strip()
     if is_jp:
         # JP-Set → EN Set-ID mappen, dann normal über PokémonTCG API suchen
         # (Die API hat EN-Karten der JP-Sets unter derselben set.id)
@@ -1549,10 +1548,11 @@ async def _search_card(message, query: str):
         if de in query_lower:
             query_lower = query_lower.replace(de, en)
 
-    # Set erkennen
+    # Set erkennen – ALL_SETS + FALLBACK_SETS kombiniert
     matched_set = None
     best_match  = ""
-    for set_name in ALL_SETS.keys():
+    all_known_sets = {**FALLBACK_SETS, **ALL_SETS}  # Fallback + API zusammen
+    for set_name in all_known_sets.keys():
         if set_name in query_lower and len(set_name) > len(best_match):
             best_match = set_name
 
@@ -2609,88 +2609,12 @@ DE_TO_EN_POKEMON = {
     "iron boulder":"iron-boulder",
 }
 
-# JP Set-IDs für die API
-# JP Set-IDs – EN JP-Name → Pokémon TCG API Set-ID
-JP_SET_IDS = {
-    # ── Scarlet & Violet JP ────────────────────────────────
-    "151 jp":                    "sv2a",   # Pokémon Card 151
-    "pokemon card 151":          "sv2a",
-    "triplet beat":              "sv1a",   # = Scarlet & Violet 151 Vorstufe
-    "clay burst":                "sv2D",   # = Paldea Evolved Teil
-    "snow hazard":               "sv2P",
-    "ruler of the black flame":  "sv3a",   # = Obsidian Flames JP
-    "ancient roar":              "sv4M",   # = Paradox Rift JP Teil
-    "future flash":              "sv4K",
-    "wild force":                "sv5M",   # = Temporal Forces JP
-    "cyber judge":               "sv5R",
-    "crimson haze":              "sv5a",   # = Twilight Masquerade JP
-    "mask of change":            "sv6",    # = Shrouded Fable JP
-    "night wanderer":            "sv6pt5",
-    "terastal festival":         "sv6a",   # = Prismatische Entwicklungen JP
-    "terastal festival ex":      "sv6a",
-    "stellar miracle":           "sv7",    # = Stellar Crown JP
-    "paradise dragona":          "sv7R",   # = Surging Sparks JP
-    "super electric breaker":    "sv8",    # = Journey Together JP
-    "battle partners":           "sv9",    # = Destined Rivals JP
-    "shiny treasure":            "sv4a",   # = Paldean Fates JP
-    "shiny treasure ex":         "sv4a",
-    # ── Sword & Shield JP ──────────────────────────────────
-    "vstar universe":            "swsh12pt5", # = Crown Zenith JP
-    "incandescent arcana":       "swsh11",    # = Silver Tempest JP
-    "lost abyss":                "swsh10a",   # = Lost Origin JP
-    "dark phantasma":            "swsh11a",
-    "vmax climax":               "swsh8a",    # = Brilliant Stars JP
-    "blue sky stream":           "swsh7a",    # = Evolving Skies JP
-    "eevee heroes":              "swsh6a",    # = Chilling Reign JP
-    "peerless fighters":         "swsh5a",    # = Battle Styles JP
-    "single strike master":      "swsh5S",
-    "rapid strike master":       "swsh5R",
-    "shiny star v":              "swsh4a",    # = Vivid Voltage JP
-    "amazing volt tackle":       "swsh4",
-    "legendary heartbeat":       "swsh3a",    # = Darkness Ablaze JP
-    "infinity zone":             "swsh3",
-    "rebel clash jp":            "swsh2",
-    # ── Kurzformen & Alternativen ──────────────────────────
-    "terastal":                  "sv6a",
-    "prismatische entwicklungen":"sv6a",
-    "prismatische":              "sv6a",
-    "shiny":                     "sv4a",
-    "vmax":                      "swsh8a",
-    "climax":                    "swsh8a",
-    "151":                       "sv2a",
-}
+# JP-Suche deaktiviert – nur DE und EN
+JP_SET_IDS = {}
 
-# Deutsche Set-Namen → JP Set-ID
-# So kann man "nachtara prismatische entwicklungen jp" schreiben
-DE_SET_TO_JP = {
-    # Scarlet & Violet
-    "prismatische entwicklungen":  "sv6a",   # Terastal Festival ex
-    "maskerade im zwielicht":      "sv5a",   # Crimson Haze
-    "verborgene fabel":            "sv6",    # Mask of Change
-    "stellarkrone":                "sv7",    # Stellar Miracle
-    "stürmische funken":           "sv7R",   # Paradise Dragona
-    "zeitliche mächte":            "sv5M",   # Wild Force / Cyber Judge
-    "twilight masquerade jp":      "sv5a",
-    "paldeas schicksale":          "sv4a",   # Shiny Treasure ex
-    "paradoxrift":                 "sv4M",   # Ancient Roar / Future Flash
-    "obsidianflammen":             "sv3a",   # Ruler of the Black Flame
-    "entwicklungen in paldea":     "sv2D",   # Clay Burst / Snow Hazard
-    "151 jp":                      "sv2a",
-    "reisegefährten":              "sv8",    # Super Electric Breaker
-    "ewige rivalen":               "sv9",    # Battle Partners
-    # Sword & Shield
-    "zenit der könige":            "swsh12pt5", # VSTAR Universe
-    "silberne sturmwinde":         "swsh11",    # Incandescent Arcana
-    "verlorener ursprung":         "swsh10a",   # Lost Abyss
-    "strahlende sterne":           "swsh8a",    # VMAX Climax
-    "drachenwandel":               "swsh7a",    # Blue Sky Stream
-    "schaurige herrschaft":        "swsh6a",    # Eevee Heroes
-    "kampfstile":                  "swsh5a",    # Peerless Fighters
-    "farbenschock":                "swsh4",     # Amazing Volt Tackle
-    "flammen der finsternis":      "swsh3a",    # Legendary Heartbeat
-    "fusionsangriff":              "swsh8",     # Fusion Arts JP
-    "astralglanz":                 "swsh10",    # Lost Origin JP Basis
-}
+# JP-Übersetzung deaktiviert
+DE_SET_TO_JP = {}
+
 
 async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """JP-Suche: /jp shiggy 151 jp"""
@@ -4124,7 +4048,6 @@ def main():
     app.add_handler(CommandHandler("deal",         setdeal))
     app.add_handler(CommandHandler("portfolio_add",portfolio_add))
     app.add_handler(CommandHandler("portfolio",    portfolio_show))
-    app.add_handler(CommandHandler("jp",           jp_search))
 
     # Payments
 

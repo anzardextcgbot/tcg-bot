@@ -1352,9 +1352,19 @@ async def send_card_details(message, card):
         + "\n".join(preis_zeilen)
     )
 
-    # Nur Cardmarket Button für Einzelkarten (kein Beobachten/Entfernen hier)
+    # Karten-Key – eindeutig pro Karte (Name|Set|Nummer)
+    safe_name = f"{name}|{set_nm}|{number}"[:55]
+
     keyboard = [
+        # Zeile 1: Cardmarket
         [InlineKeyboardButton("🛒 Direkt auf Cardmarket", url=cm_url)],
+        # Zeile 2: Preisziel + Deal-Alert
+        [
+            InlineKeyboardButton("🎯 Preisziel", callback_data=f"pz_{safe_name}"),
+            InlineKeyboardButton("🔥 Deal-Alert", callback_data=f"da_{safe_name}"),
+        ],
+        # Zeile 3: Portfolio hinzufügen
+        [InlineKeyboardButton("📊 Portfolio +", callback_data=f"pa_{safe_name}")],
     ]
 
     if image:
@@ -1401,8 +1411,8 @@ async def _search_card(message, query: str):
                 is_jp = True
                 break
     if is_jp:
-        # Fake Update-Objekt für jp_search nutzen geht nicht direkt
-        # Stattdessen: direkt JP-Logik hier inline
+        # JP-Set → EN Set-ID mappen, dann normal über PokémonTCG API suchen
+        # (Die API hat EN-Karten der JP-Sets unter derselben set.id)
         jp_query = query_lower
         # DE Namen → EN
         for de_name, en_name in DE_TO_EN_POKEMON.items():
@@ -1472,51 +1482,50 @@ async def _search_card(message, query: str):
             except Exception as e:
                 print(f"⚠️ Fallback API Fehler: {e}")
 
+        # Nur echte Dicts behalten
+        cards = [c for c in cards if isinstance(c, dict)]
+
         if not cards:
+            # JP nicht gefunden → still als normale EN-Suche weitermachen
+            query_lower = jp_query
+            is_jp = False
+            # Kein return – fällt durch zu normaler Suche unten
+
+        if is_jp and cards:
+            user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
+            last_search_results[user_id] = cards[:8]
+            try:
+                now = datetime.now().isoformat()
+                cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
+                for pos, card in enumerate(cards[:8], 1):
+                    cursor.execute(
+                        "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
+                        (user_id, pos, json.dumps(card, ensure_ascii=False), now)
+                    )
+                conn.commit()
+            except Exception:
+                pass
+            if len(cards) == 1:
+                await send_card_details(message, cards[0])
+                return
+            keyboard = []
+            for idx, card in enumerate(cards[:8], 1):
+                prices = card.get("cardmarket", {}).get("prices", {}) if isinstance(card.get("cardmarket"), dict) else {}
+                trend  = prices.get("trendPrice", "–")
+                set_obj = card.get("set", {})
+                set_nm = set_obj.get("name", "?") if isinstance(set_obj, dict) else str(set_obj)
+                num    = card.get("number", card.get("localId", "?"))
+                keyboard.append([InlineKeyboardButton(
+                    f"{idx}. {card.get('name','?')} | {set_nm} | #{num}" + (f" | {trend}€" if trend != "–" else ""),
+                    callback_data=f"sel_{user_id}_{idx}"
+                )])
             await message.reply_text(
-                f"❌ Keine Karte gefunden für: <b>{jp_query}</b>\n\nTipp: Englischen Namen benutzen.\nSchiggy → squirtle · Glurak → charizard",
-                parse_mode="HTML"
+                f"🇯🇵 JP-Ergebnisse für: <b>{jp_query}</b>",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return
-        # Sicherstellen dass alle Karten Dicts sind (kein String-Müll)
-        cards = [c for c in cards if isinstance(c, dict)]
-        if not cards:
-            await message.reply_text(f"❌ Keine Karte gefunden für: {jp_query}")
-            return
-
-        user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
-        last_search_results[user_id] = cards[:8]
-        try:
-            now = datetime.now().isoformat()
-            cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
-            for pos, card in enumerate(cards[:8], 1):
-                cursor.execute(
-                    "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
-                    (user_id, pos, json.dumps(card, ensure_ascii=False), now)
-                )
-            conn.commit()
-        except Exception:
-            pass
-        if len(cards) == 1:
-            await send_card_details(message, cards[0])
-            return
-        keyboard = []
-        for idx, card in enumerate(cards[:8], 1):
-            prices = card.get("cardmarket", {}).get("prices", {}) if isinstance(card.get("cardmarket"), dict) else {}
-            trend  = prices.get("trendPrice", "–")
-            set_obj = card.get("set", {})
-            set_nm = set_obj.get("name", "?") if isinstance(set_obj, dict) else str(set_obj)
-            num    = card.get("number", card.get("localId", "?"))
-            keyboard.append([InlineKeyboardButton(
-                f"{idx}. {card.get('name','?')} | {set_nm} | #{num}" + (f" | {trend}€" if trend != "–" else ""),
-                callback_data=f"sel_{user_id}_{idx}"
-            )])
-        await message.reply_text(
-            f"🇯🇵 JP-Ergebnisse für: <b>{jp_query}</b>",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
+        # JP nicht gefunden – normale Suche unten läuft weiter
 
     # DE Pokémon-Namen → EN übersetzen (z.B. "Glurak" → "Charizard")
     for de_name, en_name in DE_TO_EN_POKEMON.items():
@@ -1928,6 +1937,156 @@ async def button_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await send_card_details(query.message, cards[choice - 1])
+
+async def deal_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User hat auf 🔥 Deal-Alert gedrückt."""
+    query   = update.callback_query
+    await query.answer()
+    user_id = str(query.from_user.id)
+
+    if not is_subscribed(user_id):
+        keyboard = [[InlineKeyboardButton("🔓 Premium holen", callback_data="buy_sub")]]
+        await query.message.reply_text(
+            "🔒 Deal-Alerts sind nur für Premium-Abonnenten.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    card_key  = query.data.replace("da_", "")
+    parts     = card_key.split("|")
+    card_name = parts[0] if parts else card_key
+    set_name  = parts[1] if len(parts) > 1 else ""
+
+    # Mit 15% Standard-Schwelle speichern
+    cursor.execute(
+        "INSERT INTO deal_alerts (user_id, card_name, threshold_pct) VALUES (?,?,15) "
+        "ON CONFLICT(user_id, card_name) DO UPDATE SET threshold_pct=15",
+        (user_id, f"{card_name}|{set_name}")
+    )
+    conn.commit()
+
+    await query.message.reply_text(
+        f"🔥 <b>Deal-Alert aktiviert!</b>\n\n"
+        f"🃏 {card_name} · {set_name}\n"
+        f"📉 Alert wenn Preis <b>15% unter Trend-Preis</b> fällt\n\n"
+        f"Eigene Schwelle: <code>/deal {card_name} 20</code>\n"
+        f"<i>Prüft alle 5 Minuten.</i>",
+        parse_mode="HTML"
+    )
+
+async def portfolio_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User hat auf 📊 Portfolio + gedrückt."""
+    query   = update.callback_query
+    await query.answer()
+    user_id = str(query.from_user.id)
+
+    if not is_subscribed(user_id):
+        keyboard = [[InlineKeyboardButton("🔓 Premium holen", callback_data="buy_sub")]]
+        await query.message.reply_text(
+            "🔒 Portfolio ist nur für Premium-Abonnenten.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    card_key  = query.data.replace("pa_", "")
+    parts     = card_key.split("|")
+    card_name = parts[0] if parts else card_key
+    set_name  = parts[1] if len(parts) > 1 else ""
+    number    = parts[2] if len(parts) > 2 else ""
+
+    # Aktuellen Preis aus Cache holen
+    cursor.execute(
+        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC LIMIT 8",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    current_price = None
+    for row in rows:
+        try:
+            c = json.loads(row[0])
+            if c.get("name","").lower() == card_name.lower():
+                prices = c.get("cardmarket",{}).get("prices",{})
+                current_price = prices.get("lowPrice") or prices.get("trendPrice")
+                break
+        except Exception:
+            pass
+
+    price_hint = f" · Aktuell: {current_price} €" if current_price else ""
+
+    # Mit 1x und aktuellem Preis sofort ins Portfolio
+    now = datetime.now().isoformat()
+    cursor.execute(
+        "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
+        "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
+        "quantity=quantity+1",
+        (user_id, card_name, set_name, current_price or 0.0, now)
+    )
+    conn.commit()
+
+    await query.message.reply_text(
+        f"📊 <b>Portfolio aktualisiert!</b>\n\n"
+        f"🃏 {card_name} · {set_name}{price_hint}\n"
+        f"➕ 1x hinzugefügt\n\n"
+        f"/portfolio – Gesamtwert anzeigen\n"
+        f"<i>Kaufpreis anpassen: /portfolio_add {card_name} | 1 | PREIS</i>",
+        parse_mode="HTML"
+    )
+
+async def preisziel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User hat auf 🎯 Preisziel setzen gedrückt – fragt nach Wunschpreis."""
+    query   = update.callback_query
+    await query.answer()
+    user_id = str(query.from_user.id)
+
+    if not is_subscribed(user_id):
+        keyboard = [[InlineKeyboardButton("🔓 Premium holen", callback_data="buy_sub")]]
+        await query.message.reply_text(
+            "🔒 Preisziele sind nur für Premium-Abonnenten.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    card_key = query.data.replace("pz_", "")
+    parts    = card_key.split("|")
+    card_name = parts[0] if parts else card_key
+    set_name  = parts[1] if len(parts) > 1 else ""
+    number    = parts[2] if len(parts) > 2 else ""
+
+    # Preis aus letzter Suche holen
+    cursor.execute(
+        "SELECT card_json FROM card_search_cache WHERE user_id=? ORDER BY position ASC LIMIT 8",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    current_price = None
+    for row in rows:
+        try:
+            c = json.loads(row[0])
+            if c.get("name","").lower() == card_name.lower():
+                prices = c.get("cardmarket",{}).get("prices",{})
+                current_price = prices.get("lowPrice") or prices.get("trendPrice")
+                break
+        except Exception:
+            pass
+
+    price_hint = f"\n\U0001f4b0 Aktuell: {current_price} €" if current_price else ""
+
+
+    # In DB als "warte auf Preisziel" speichern
+    cursor.execute(
+        "INSERT OR REPLACE INTO price_targets (user_id, card_name, target_price, created_at) VALUES (?,?,?,?)",
+        (user_id, f"{card_name}|{set_name}", -1, datetime.now().isoformat())
+    )
+    conn.commit()
+
+    await query.message.reply_text(
+        f"🎯 <b>Preisziel setzen</b>\n\n"
+        f"🃏 {card_name} · {set_name} · #{number}{price_hint}\n\n"
+        f"Schreib jetzt deinen Wunschpreis:\n"
+        f"<code>/preisziel {card_name} 50</code>\n\n"
+        f"<i>Der Bot benachrichtigt dich sobald der Preis darunter fällt.</i>",
+        parse_mode="HTML"
+    )
 
 async def action_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query   = update.callback_query
@@ -2876,6 +3035,12 @@ async def callback_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     elif data.startswith("select_"):
         await button_select(update, context)
+    elif data.startswith("pz_"):
+        await preisziel_callback(update, context)
+    elif data.startswith("da_"):
+        await deal_alert_callback(update, context)
+    elif data.startswith("pa_"):
+        await portfolio_add_callback(update, context)
     elif data.startswith("tc_") or data.startswith("utc_") or data.startswith("track_") or data.startswith("untrack_"):
         await action_button_handler(update, context)
     elif data.startswith("trackproduct_"):
@@ -2918,17 +3083,21 @@ async def setpreisziel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = str(update.effective_user.id)
     now = datetime.now().isoformat()
+    # card_name kann "Charizard ex|151|6" Format haben (vom Button)
+    # oder normaler Name vom Command
     cursor.execute(
         "INSERT INTO price_targets (user_id, card_name, target_price, created_at) VALUES (?,?,?,?) "
         "ON CONFLICT(user_id, card_name) DO UPDATE SET target_price=excluded.target_price",
         (user_id, card_name, target, now)
     )
     conn.commit()
+    display_name = card_name.split("|")[0] if "|" in card_name else card_name
+    set_hint     = f" ({card_name.split('|')[1]})" if "|" in card_name and len(card_name.split('|')) > 1 else ""
     await update.message.reply_text(
         f"🎯 <b>Preisziel gesetzt!</b>\n\n"
-        f"🃏 {card_name}\n"
+        f"🃏 {display_name}{set_hint}\n"
         f"💰 Alert wenn Preis unter <b>{target} €</b> fällt\n\n"
-        f"Du wirst sofort benachrichtigt!",
+        f"✅ Ich prüfe alle 5 Minuten!",
         parse_mode="HTML"
     )
 

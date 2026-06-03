@@ -40,7 +40,7 @@ BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
 STRIPE_TOKEN          = os.getenv("STRIPE_TOKEN", "")        # Telegram Payments Token von @BotFather
 STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")   # sk_live_... aus Stripe Dashboard
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "") # whsec_... aus Stripe Webhook
-MONTHLY_PRICE    = 499   # Preis in Cent = 6,99€
+MONTHLY_PRICE    = 499   # Preis in Cent = 4,99€
 CURRENCY         = "EUR"
 ADMIN_ID         = os.getenv("ADMIN_ID", "")          # Deine Telegram-ID für Admin-Befehle
 MONTHLY_PRICE    = 499                                 # Preis in Cent → 4,99 €
@@ -1726,6 +1726,41 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text       = update.message.text
     text_lower = text.lower()
 
+    # Warte auf Kaufpreis-Eingabe für Portfolio
+    if context.user_data.get("awaiting_portfolio"):
+        try:
+            buy_price = float(text.replace(",", ".").replace("€", "").strip())
+            info      = context.user_data.pop("awaiting_portfolio")
+            card_name = info["card_name"]
+            set_name  = info["set_name"]
+            cur_price = info.get("current_price") or buy_price
+            user_id   = str(update.effective_user.id)
+            now       = datetime.now().isoformat()
+
+            # 0 eingegeben → aktuellen Marktpreis nehmen
+            if buy_price == 0:
+                buy_price = cur_price or 0.0
+
+            cursor.execute(
+                "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
+                "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
+                "quantity=quantity+1, buy_price=excluded.buy_price",
+                (user_id, card_name, set_name, buy_price, now)
+            )
+            conn.commit()
+
+            await update.message.reply_text(
+                f"📊 <b>Portfolio aktualisiert!</b>\n\n"
+                f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + "\n"
+                f"➕ 1x hinzugefügt\n"
+                f"💰 Kaufpreis: <b>{buy_price} €</b>\n\n"
+                f"/portfolio – Gesamtwert anzeigen",
+                parse_mode="HTML"
+            )
+            return
+        except ValueError:
+            context.user_data.pop("awaiting_portfolio", None)
+
     # Warte auf Preis-Eingabe für Preisziel
     if context.user_data.get("awaiting_preisziel"):
         try:
@@ -2063,20 +2098,19 @@ async def portfolio_add_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     price_hint = f" · {current_price} €" if current_price else ""
 
-    now = datetime.now().isoformat()
-    cursor.execute(
-        "INSERT INTO portfolio (user_id, card_name, set_name, quantity, buy_price, added_at) "
-        "VALUES (?,?,?,1,?,?) ON CONFLICT(user_id, card_name, set_name) DO UPDATE SET "
-        "quantity=quantity+1, buy_price=excluded.buy_price",
-        (user_id, card_name, set_name, current_price or 0.0, now)
-    )
-    conn.commit()
+    # Karte in user_data speichern – warten auf Kaufpreis-Eingabe
+    context.user_data["awaiting_portfolio"] = {
+        "card_name":     card_name,
+        "set_name":      set_name,
+        "current_price": current_price,
+    }
 
     await query.message.reply_text(
-        f"📊 <b>Portfolio aktualisiert!</b>\n\n"
-        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"{price_hint}\n"
-        f"➕ 1x hinzugefügt · Kaufpreis: {current_price or 0} €\n\n"
-        f"/portfolio – Gesamtwert anzeigen",
+        f"📊 <b>Portfolio – Kaufpreis eingeben</b>\n\n"
+        f"🃏 <b>{card_name}</b>" + (f" · {set_name}" if set_name else "") + f"{price_hint}\n\n"
+        f"Wie viel hast du bezahlt? Schreib einfach den Preis:\n"
+        f"<i>(z.B. 89.99 oder 45)</i>\n\n"
+        f"Oder schreib <b>0</b> um den aktuellen Marktpreis zu nehmen.",
         parse_mode="HTML"
     )
 
@@ -3941,55 +3975,58 @@ async def job_pokemon_center_check(context: ContextTypes.DEFAULT_TYPE):
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
         )
-        html = resp.text.lower()
+        import hashlib as _hashlib
 
-        # Produkte aus der Seite extrahieren
-        import re as _re
-        product_titles = _re.findall(
-            r'(?:class="[^"]*product[^"]*"[^>]*>|<h[123][^>]*>)([^<]{5,80})</',
+        # Produkt-Links direkt aus der Seite extrahieren
+        product_links_raw = re.findall(
+            r'href="(/(?:de-de|en-gb)/product/[^"?]+)',
             resp.text
         )
-        # Pokémon TCG Produkte filtern
-        tcg_keywords = [
-            "booster", "display", "elite trainer", "etb", "collection",
-            "tin", "bundle", "premium", "trainer box", "upc", "case",
-        ]
-        found_products = []
-        for title in product_titles:
-            title_lower = title.lower().strip()
-            if any(kw in title_lower for kw in tcg_keywords):
-                if "pokémon" in title_lower or "pokemon" in title_lower or len(title_lower) < 60:
-                    found_products.append(title.strip()[:80])
+        product_links_raw = list(dict.fromkeys(product_links_raw))  # Duplikate raus
 
-        # Prüfen ob neue Produkte da sind
+        # Hash der Produktliste – ändert sich nur wenn neue Produkte da sind
+        current_hash = _hashlib.md5(str(sorted(product_links_raw)).encode()).hexdigest()
+
         cursor.execute(
             "SELECT last_status FROM restock_status WHERE url=?",
             (pc_url,)
         )
-        row          = cursor.fetchone()
-        old_count    = int(row[0]) if row and row[0] and row[0].isdigit() else 0
-        new_count    = len(found_products)
+        row      = cursor.fetchone()
+        old_hash = row[0] if row else ""
+
+        # Nur weitermachen wenn sich etwas geändert hat
+        if current_hash == old_hash:
+            continue  # Nichts neues – kein Alert
 
         cursor.execute(
             "INSERT INTO restock_status (url, last_status) VALUES (?,?) "
             "ON CONFLICT(url) DO UPDATE SET last_status=excluded.last_status",
-            (pc_url, str(new_count))
+            (pc_url, current_hash)
         )
         conn.commit()
 
-        # Nur benachrichtigen wenn neue Produkte hinzugekommen sind
-        if new_count <= old_count and old_count > 0:
-            return
+        # Erste Initialisierung – kein Alert senden, nur Hash speichern
+        if not old_hash:
+            print(f"✅ {pc_name}: Erste Initialisierung, {len(product_links_raw)} Produkte gecacht")
+            continue
+
+        print(f"🆕 {pc_name}: Neue Produkte erkannt!")
 
         # Produktliste für die Nachricht
-        product_list = ""
-        if found_products:
-            shown = found_products[:10]
-            product_list = "\n".join(f"• {p}" for p in shown)
-            if len(found_products) > 10:
-                product_list += f"\n• ... und {len(found_products)-10} weitere"
+        base_domain   = "https://www.pokemoncenter.com"
+        product_list  = ""
+        if product_links_raw:
+            lines = []
+            for link in product_links_raw[:10]:
+                full_url   = base_domain + link
+                slug       = link.split("/product/")[-1].split("?")[0]
+                name_guess = slug.replace("-", " ").title()[:55]
+                lines.append(f"• <a href='{full_url}'>{name_guess}</a>")
+            product_list = "\n".join(lines)
+            if len(product_links_raw) > 10:
+                product_list += f"\n• <a href='{pc_url}'>... weitere anzeigen</a>"
         else:
-            product_list = "• Neue Produkte verfügbar"
+            product_list = f"• <a href='{pc_url}'>Alle verfügbaren Produkte</a>"
 
         # Direkte Produkt-Links aus der Seite extrahieren
         import re as _re

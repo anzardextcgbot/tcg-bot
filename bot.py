@@ -785,6 +785,7 @@ SHOP_SEARCH_PATTERNS = {
     "dm":                   "https://www.dm.de/search?query={query}",
     # ── UK / Internationale TCG-Shops ─────────────────────────────
     "Chaos Cards (UK)":     "https://www.chaoscards.co.uk/search?q={query}",
+    "Pokémon Center DE":    "https://www.pokemoncenter.com/de-de/search?q={query}",
     "Pokémon Center UK":    "https://www.pokemoncenter.com/search?q={query}",
     "Total Cards (UK)":     "https://www.totalcards.net/search?q={query}",
     "Ludkins (UK)":         "https://www.ludkins.co.uk/search?type=product&q={query}",
@@ -804,7 +805,7 @@ RESTOCK_CHECK_SHOPS = [
     "Gate to the Games", "Cardbuddys", "Games Island", "Trader Online",
     "TCG-Corner", "Pokeviert", "Cardicuno", "Collect-It", "Kofuku",
     "Legendary Cards", "bigpanda", "Chaos Cards (UK)", "Total Cards (UK)",
-    "Ludkins (UK)", "Amazon DE", "Smyths", "GameStop DE", "MediaMarkt",
+    "Ludkins (UK)", "Amazon DE", "Smyths", "GameStop DE", "MediaMarkt", "Pokémon Center DE",
     "Plaza Japan", "Meccha Japan",
 ]
 
@@ -2881,13 +2882,27 @@ async def job_price_check(context: ContextTypes.DEFAULT_TYPE):
 
     for user_id, card_name in tracked:
         try:
-            cards = search_pokemon_card(card_name)
+            # card_name kann "Charizard ex|151" Format haben
+            parts     = card_name.split("|")
+            cn        = parts[0].strip()
+            sn        = parts[1].strip() if len(parts) > 1 else None
+            cards     = search_pokemon_card(cn, sn)
             if not cards:
                 continue
-            card      = cards[0]
-            name      = card.get("name", card_name)
-            prices    = card.get("cardmarket", {}).get("prices", {})
-            new_price = prices.get("trendPrice")
+            # Richtige Karte mit passendem Set finden
+            best = None
+            for card in cards:
+                if not isinstance(card, dict): continue
+                s = card.get("set", {})
+                sname = s.get("name","").lower() if isinstance(s, dict) else ""
+                if not sn or sn.lower() in sname:
+                    best = card
+                    break
+            card      = best or (cards[0] if isinstance(cards[0], dict) else None)
+            if not card: continue
+            name      = card_name  # Original mit Set-Info behalten
+            prices    = card.get("cardmarket", {}).get("prices", {}) or {}
+            new_price = prices.get("lowPrice") or prices.get("trendPrice")
             if not new_price:
                 continue
 
@@ -3335,25 +3350,34 @@ async def portfolio_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_current  = 0.0
     lines = []
 
-    for card_name, set_name, qty, buy_price in rows:
+    for card_name_raw, set_name_raw, qty, buy_price in rows:
+        # card_name kann "Charizard ex|151" Format haben
+        if "|" in card_name_raw and not set_name_raw:
+            parts     = card_name_raw.split("|")
+            card_name = parts[0].strip()
+            set_name  = parts[1].strip() if len(parts) > 1 else ""
+        else:
+            card_name = card_name_raw
+            set_name  = set_name_raw
+
         invested = qty * buy_price
         total_invested += invested
-        # Aktuellen Preis von API holen
+
+        # Aktuellen Preis von API holen – mit richtigem Set
         cards = search_pokemon_card(card_name, set_name if set_name else None)
         current_price = 0.0
         if cards:
             for card in cards:
                 if not isinstance(card, dict):
                     continue
-                s = card.get("set", {})
+                s     = card.get("set", {})
                 sname = s.get("name","").lower() if isinstance(s, dict) else ""
-                if set_name and set_name.lower() in sname:
+                if not set_name or set_name.lower() in sname:
                     prices = card.get("cardmarket", {}).get("prices", {}) or {}
-                    current_price = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
-                    break
-            if not current_price and isinstance(cards[0], dict):
-                prices = cards[0].get("cardmarket", {}).get("prices", {}) or {}
-                current_price = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
+                    p = float(prices.get("lowPrice") or prices.get("trendPrice") or 0)
+                    if p > 0:
+                        current_price = p
+                        break
         current_total = qty * current_price
         total_current += current_total
         diff     = current_total - invested
@@ -3643,17 +3667,17 @@ async def job_price_targets(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=(
-                        f"🎯 <b>PREISZIEL ERREICHT!</b>\n\n"
-                        f"🃏 <b>{card_name}</b>\n"
-                        f"💰 Aktueller Preis: <b>{low_price} €</b>\n"
-                        f"🎯 Dein Ziel: {target_price} €\n\n"
-                        f"{'<a href="' + cm_url + '">🛒 Jetzt kaufen auf Cardmarket</a>' if cm_url else '🛒 Jetzt auf Cardmarket kaufen!'}"
+                        "\U0001f3af <b>PREISZIEL ERREICHT!</b>\n\n"
+                        + f"\U0001f0cf <b>{cn}</b>" + (f" \u00b7 {sn}" if sn else "") + "\n"
+                        + f"\U0001f4b0 Aktueller Preis: <b>{low_price} \u20ac</b>\n"
+                        + f"\U0001f3af Dein Ziel: {target_price} \u20ac\n\n"
+                        + (f'<a href="{cm_url}">\U0001f6d2 Jetzt kaufen</a>' if cm_url else "\U0001f6d2 Jetzt auf Cardmarket!")
                     ),
                     parse_mode="HTML",
                     disable_web_page_preview=True
                 )
         except Exception as e:
-            print(f"⚠️ Preisziel-Check Fehler: {e}")
+            print(f"\u26a0\ufe0f Preisziel-Check Fehler: {e}")
 
 async def job_deal_alerts(context: ContextTypes.DEFAULT_TYPE):
     """Prüft ob Karten deutlich unter Trend-Preis sind."""
@@ -3871,6 +3895,123 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
             print(f"⚠️ Amazon Job Fehler ({asin}): {e}")
 
 
+
+# ─────────────────────────────────────────
+# POKÉMON CENTER DE – Restock-Überwachung
+# ─────────────────────────────────────────
+POKEMON_CENTER_DE_URL = (
+    "https://www.pokemoncenter.com/de-de/category/trading-card-game"
+    "?availability=true&category=tcg-cards"
+)
+POKEMON_CENTER_GB_URL = (
+    "https://www.pokemoncenter.com/en-gb/category/trading-card-game"
+    "?availability=true&category=tcg-cards"
+)
+POKEMON_CENTER_URLS = {
+    "Pokémon Center DE": POKEMON_CENTER_DE_URL,
+    "Pokémon Center UK": POKEMON_CENTER_GB_URL,
+}
+
+async def job_pokemon_center_check(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Überwacht den offiziellen Pokémon Center DE auf neue Produkte.
+    Schickt Alert wenn neue Karten/Produkte verfügbar sind.
+    """
+    cursor.execute(
+        "SELECT user_id FROM subscriptions WHERE status='active' "
+        "UNION SELECT ? WHERE ? != ''",
+        (ADMIN_ID, ADMIN_ID)
+    )
+    all_users = list({r[0] for r in cursor.fetchall()})
+    if not all_users:
+        return
+
+    for pc_name, pc_url in POKEMON_CENTER_URLS.items():
+      try:
+        resp = requests.get(
+            pc_url,
+            timeout=20,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "de-DE,de;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+        )
+        html = resp.text.lower()
+
+        # Produkte aus der Seite extrahieren
+        import re as _re
+        product_titles = _re.findall(
+            r'(?:class="[^"]*product[^"]*"[^>]*>|<h[123][^>]*>)([^<]{5,80})</',
+            resp.text
+        )
+        # Pokémon TCG Produkte filtern
+        tcg_keywords = [
+            "booster", "display", "elite trainer", "etb", "collection",
+            "tin", "bundle", "premium", "trainer box", "upc", "case",
+        ]
+        found_products = []
+        for title in product_titles:
+            title_lower = title.lower().strip()
+            if any(kw in title_lower for kw in tcg_keywords):
+                if "pokémon" in title_lower or "pokemon" in title_lower or len(title_lower) < 60:
+                    found_products.append(title.strip()[:80])
+
+        # Prüfen ob neue Produkte da sind
+        cursor.execute(
+            "SELECT last_status FROM restock_status WHERE url=?",
+            (pc_url,)
+        )
+        row          = cursor.fetchone()
+        old_count    = int(row[0]) if row and row[0] and row[0].isdigit() else 0
+        new_count    = len(found_products)
+
+        cursor.execute(
+            "INSERT INTO restock_status (url, last_status) VALUES (?,?) "
+            "ON CONFLICT(url) DO UPDATE SET last_status=excluded.last_status",
+            (pc_url, str(new_count))
+        )
+        conn.commit()
+
+        # Nur benachrichtigen wenn neue Produkte hinzugekommen sind
+        if new_count <= old_count and old_count > 0:
+            return
+
+        # Produktliste für die Nachricht
+        product_list = ""
+        if found_products:
+            shown = found_products[:10]
+            product_list = "\n".join(f"• {p}" for p in shown)
+            if len(found_products) > 10:
+                product_list += f"\n• ... und {len(found_products)-10} weitere"
+        else:
+            product_list = "• Neue Produkte verfügbar"
+
+        for user_id in all_users:
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        f"🏪 <b>{pc_name.upper()} – RESTOCK!</b>\n\n"
+                        f"Neue Produkte im offiziellen Shop verfügbar:\n\n"
+                        f"{product_list}\n\n"
+                        f"👉 <a href='{pc_url}'>Jetzt im Pokémon Center kaufen!</a>\n\n"
+                        f"⚡ <i>Schnell sein – Official Store Produkte sind oft limitiert!</i>"
+                    ),
+                    parse_mode="HTML",
+                    disable_web_page_preview=False
+                )
+            except Exception as e:
+                print(f"⚠️ Pokémon Center Alert Fehler ({user_id}): {e}")
+
+      except Exception as e:
+        print(f"⚠️ {pc_name} Check Fehler: {e}")
+
+
 def main():
     global telegram_app_ref
     app = Application.builder().token(BOT_TOKEN).build()
@@ -3886,7 +4027,8 @@ def main():
     jq.run_repeating(job_price_targets,    interval=300,   first=60)   # Preisziele
     jq.run_repeating(job_deal_alerts,      interval=300,   first=90)   # Deal-Alerts
     jq.run_repeating(job_new_sets,         interval=3600,  first=120)  # Neue Sets
-    jq.run_repeating(job_amazon_invite_check, interval=300, first=20) # Amazon alle 5 Min
+    jq.run_repeating(job_amazon_invite_check,   interval=300, first=20)  # Amazon alle 5 Min
+    jq.run_repeating(job_pokemon_center_check,  interval=180, first=10)  # Pokémon Center alle 3 Min
 
     # Commands
     app.add_handler(CommandHandler("start",        start))

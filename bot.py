@@ -1390,26 +1390,10 @@ async def _search_card(message, query: str):
     CARD_SEARCH_COUNT[query.lower()] = CARD_SEARCH_COUNT.get(query.lower(), 0) + 1
     query_lower = query.lower().strip()
 
-    # JP-Erkennung: NUR wenn explizit "jp" geschrieben wird
-    is_jp = (
-        query_lower.endswith(" jp") or
-        " jp " in query_lower or
-        query_lower.startswith("jp ")
-    )
-    # Oder wenn ein echter JP-exklusiver Set-Name vorkommt
-    if not is_jp:
-        jp_only_sets = [
-            "shiny treasure", "vmax climax", "eevee heroes", "vstar universe",
-            "blue sky stream", "lost abyss", "dark phantasma", "vmax climax",
-            "ruler of the black flame", "terastal festival", "paradise dragona",
-            "night wanderer", "battle partners", "crimson haze", "triplet beat",
-            "clay burst", "snow hazard", "ancient roar", "future flash",
-            "wild force", "cyber judge", "incandescent arcana",
-        ]
-        for jp_name in jp_only_sets:
-            if jp_name in query_lower:
-                is_jp = True
-                break
+    # JP-Suche deaktiviert – immer normale EN/DE Suche
+    is_jp = False
+    # "jp" aus dem Query entfernen damit die Suche nicht gestört wird
+    query_lower = query_lower.replace(" jp", "").strip()
     if is_jp:
         # JP-Set → EN Set-ID mappen, dann normal über PokémonTCG API suchen
         # (Die API hat EN-Karten der JP-Sets unter derselben set.id)
@@ -1477,7 +1461,7 @@ async def _search_card(message, query: str):
             try:
                 url   = "https://api.pokemontcg.io/v2/cards"
                 full_q = f'name:"{jp_query}"' + (f" set.id:{matched_set_id}" if matched_set_id else "")
-                resp  = requests.get(url, params={"q": full_q, "pageSize": 20}, timeout=15)
+                resp  = requests.get(url, params={"q": full_q, "pageSize": 30}, timeout=15)
                 cards = resp.json().get("data", [])
             except Exception as e:
                 print(f"⚠️ Fallback API Fehler: {e}")
@@ -1493,11 +1477,11 @@ async def _search_card(message, query: str):
 
         if is_jp and cards:
             user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
-            last_search_results[user_id] = cards[:8]
+            last_search_results[user_id] = cards[:10]
             try:
                 now = datetime.now().isoformat()
                 cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
-                for pos, card in enumerate(cards[:8], 1):
+                for pos, card in enumerate(cards[:10], 1):
                     cursor.execute(
                         "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
                         (user_id, pos, json.dumps(card, ensure_ascii=False), now)
@@ -1509,7 +1493,7 @@ async def _search_card(message, query: str):
                 await send_card_details(message, cards[0])
                 return
             keyboard = []
-            for idx, card in enumerate(cards[:8], 1):
+            for idx, card in enumerate(cards[:10], 1):
                 prices = card.get("cardmarket", {}).get("prices", {}) if isinstance(card.get("cardmarket"), dict) else {}
                 trend  = prices.get("trendPrice", "–")
                 set_obj = card.get("set", {})
@@ -1608,9 +1592,9 @@ async def _search_card(message, query: str):
 
     scored.sort(reverse=True, key=lambda x: x[0])
     # Alle mit positivem Score, max 8
-    cards = [c for _, c in scored[:8] if _ >= 0]
+    cards = [c for _, c in scored[:10] if _ >= 0]
     if not cards:
-        cards = [c for _, c in scored[:8]]
+        cards = [c for _, c in scored[:10]]
 
     user_id = str(message.from_user.id) if hasattr(message, "from_user") else "0"
     # RAM + DB Cache speichern – DB überlebt Bot-Neustarts
@@ -2155,7 +2139,7 @@ async def set_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     resp = requests.get(
         "https://api.pokemontcg.io/v2/cards",
-        params={"q": f'set.name:"{set_name}"', "pageSize": 20},
+        params={"q": f'set.name:"{set_name}"', "pageSize": 30},
         timeout=10
     )
     cards = resp.json().get("data", [])
@@ -2675,7 +2659,7 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         api_query += f" set.id:{matched_set_id}"
 
     try:
-        resp = requests.get(url, params={"q": api_query, "pageSize": 20}, timeout=10)
+        resp = requests.get(url, params={"q": api_query, "pageSize": 30}, timeout=10)
         cards = resp.json().get("data", [])
     except Exception:
         await update.message.reply_text("❌ API nicht erreichbar, bitte erneut versuchen.")
@@ -2684,7 +2668,7 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cards:
         # Fallback: ohne Anführungszeichen suchen
         try:
-            resp = requests.get(url, params={"q": f"name:{card_name}" + (f" set.id:{matched_set_id}" if matched_set_id else ""), "pageSize": 20}, timeout=10)
+            resp = requests.get(url, params={"q": f"name:{card_name}" + (f" set.id:{matched_set_id}" if matched_set_id else ""), "pageSize": 30}, timeout=10)
             cards = resp.json().get("data", [])
         except Exception:
             cards = []
@@ -2699,13 +2683,13 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_id = str(update.effective_user.id)
-    last_search_results[user_id] = cards[:8]
+    last_search_results[user_id] = cards[:10]
 
     # In DB cachen
     try:
         now = datetime.now().isoformat()
         cursor.execute("DELETE FROM card_search_cache WHERE user_id=?", (user_id,))
-        for pos, card in enumerate(cards[:8], 1):
+        for pos, card in enumerate(cards[:10], 1):
             cursor.execute(
                 "INSERT INTO card_search_cache (user_id, position, card_json, created_at) VALUES (?,?,?,?)",
                 (user_id, pos, json.dumps(card, ensure_ascii=False), now)
@@ -2719,7 +2703,7 @@ async def jp_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = []
-    for idx, card in enumerate(cards[:8], 1):
+    for idx, card in enumerate(cards[:10], 1):
         prices = card.get("cardmarket", {}).get("prices", {})
         trend  = prices.get("trendPrice", "?")
         set_nm = card.get("set", {}).get("name", "?")

@@ -156,6 +156,19 @@ def init_db():
         CREATE TABLE IF NOT EXISTS known_sets_notified (
             set_id TEXT PRIMARY KEY
         );
+        CREATE TABLE IF NOT EXISTS amazon_products (
+            asin        TEXT PRIMARY KEY,
+            product_name TEXT,
+            amazon_url  TEXT,
+            last_status TEXT DEFAULT 'unknown',
+            added_at    TEXT
+        );
+        CREATE TABLE IF NOT EXISTS amazon_invite_alerts (
+            asin    TEXT,
+            user_id TEXT,
+            sent_at TEXT,
+            PRIMARY KEY (asin, user_id)
+        );
     """)
     conn.commit()
 
@@ -357,6 +370,93 @@ def get_amazon_search_url(query: str) -> str:
     """Direkter Amazon Produktlink für Pokémon TCG."""
     encoded = query.replace(" ", "+")
     return f"https://www.amazon.de/s?k={encoded}+pokemon+karten&rh=n%3A301128"
+
+def get_amazon_product_url(asin: str) -> str:
+    """Direkter Amazon Produkt-Link via ASIN."""
+    return f"https://www.amazon.de/dp/{asin}"
+
+def check_amazon_invite(asin: str) -> tuple:
+    """
+    Prüft ob Amazon-Einladung für ein Produkt verfügbar ist.
+    Gibt (status, url) zurück:
+    - ("invite", url)    → Einladungs-Button gefunden
+    - ("available", url) → Normal kaufbar (In den Einkaufswagen)
+    - ("soldout", url)   → Ausverkauft
+    - ("unknown", url)   → Unbekannt
+    """
+    url = get_amazon_product_url(asin)
+    try:
+        resp = requests.get(url, timeout=15, headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "de-DE,de;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        })
+        html = resp.text.lower()
+
+        # Einladungs-Erkennung
+        invite_signals = [
+            "zur einladung anmelden",
+            "einladung anfordern",
+            "request invitation",
+            "nur auf einladung",
+            "by invitation only",
+            "join waitlist",
+            "warteliste",
+            "invite only",
+        ]
+        for signal in invite_signals:
+            if signal in html:
+                return ("invite", url)
+
+        # Normal verfügbar
+        available_signals = [
+            "in den einkaufswagen",
+            "add to cart",
+            "jetzt kaufen",
+            "buy now",
+            "auf lager",
+            "in stock",
+        ]
+        for signal in available_signals:
+            if signal in html:
+                return ("available", url)
+
+        # Ausverkauft
+        sold_out_signals = [
+            "derzeit nicht verfügbar",
+            "currently unavailable",
+            "nicht auf lager",
+            "out of stock",
+            "ausverkauft",
+        ]
+        for signal in sold_out_signals:
+            if signal in html:
+                return ("soldout", url)
+
+        return ("unknown", url)
+    except Exception as e:
+        print(f"⚠️ Amazon Check Fehler ({asin}): {e}")
+        return ("unknown", url)
+
+# Bekannte Pokémon TCG Produkte auf Amazon mit ASIN
+# Diese werden automatisch überwacht
+KNOWN_AMAZON_PRODUCTS = {
+    "B0DGY2S5N1": "Prismatische Entwicklungen ETB",
+    "B0BLQWM9TW": "Karmesin & Purpur ETB",
+    "B0CQJWQK3Q": "Paldeas Schicksale ETB",
+    "B0D3GQKRPB": "Paradoxrift ETB",
+    "B0CK7BTXZZ": "Obsidianflammen ETB",
+    "B0CMTF8MKV": "Zeitliche Mächte ETB",
+    "B0D7Y9MXNW": "Maskerade im Zwielicht ETB",
+    "B0DCNDJQ7P": "Verborgene Fabel ETB",
+    "B0DGZDV9VG": "Stellarkrone ETB",
+    "B0DM3FKRVW": "Stürmische Funken ETB",
+    "B0DQWL2YMX": "Ewige Rivalen ETB",
+}
 
 
 # Hardcoded Fallback-Sets (alle wichtigen Sets)
@@ -717,29 +817,46 @@ def save_price(card_name: str, price: float):
     conn.commit()
 
 def search_pokemon_card(card_name: str, set_name: str = None, language: str = "en") -> list:
-    """Sucht Karten – TCGDex primär, PokémonTCG als Fallback."""
-    # 1. Versuch: TCGDex
-    try:
-        tcgdex_results = tcgdex_find_cards(card_name, set_name, language)
-        if tcgdex_results:
-            return tcgdex_results
-    except Exception as e:
-        print(f"⚠️ TCGDex Fehler: {e}")
-
-    # 2. Fallback: PokémonTCG API
+    """Sucht Karten – PokémonTCG primär, TCGDex als Fallback für JP."""
+    # 1. PokémonTCG API (schnell, zuverlässig für EN/DE)
     try:
         url   = "https://api.pokemontcg.io/v2/cards"
         query = f'name:"{card_name}"'
         if set_name:
             if "151" in set_name.lower():
                 query += " set.id:sv3pt5"
+            elif set_name in ALL_SETS:
+                query += f" set.id:{ALL_SETS[set_name]}"
             else:
                 query += f' set.name:"{set_name}"'
-        resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=10)
+        resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=15)
         if resp.status_code == 200:
-            return resp.json().get("data", [])
+            results = resp.json().get("data", [])
+            if results:
+                return results
     except Exception as e:
         print(f"⚠️ PokémonTCG API Fehler: {e}")
+
+    # 2. Fallback: ohne Anführungszeichen
+    try:
+        url   = "https://api.pokemontcg.io/v2/cards"
+        query = f"name:{card_name}"
+        if set_name:
+            query += f' set.name:"{set_name}"'
+        resp = requests.get(url, params={"q": query, "pageSize": 50}, timeout=15)
+        if resp.status_code == 200:
+            results = resp.json().get("data", [])
+            if results:
+                return results
+    except Exception as e:
+        print(f"⚠️ PokémonTCG API Fallback Fehler: {e}")
+
+    # 3. TCGDex als letzter Fallback (JP-Karten)
+    if language == "ja":
+        try:
+            return tcgdex_find_cards(card_name, set_name, language)
+        except Exception as e:
+            print(f"⚠️ TCGDex Fehler: {e}")
 
     return []
 
@@ -1536,29 +1653,27 @@ async def product_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Für CM-Link: Original-Query nehmen damit alle Varianten erscheinen
     cm_url = get_cardmarket_de_url(query)
 
-    # Case → Karton für Cardmarket
-    cm_query = query
-    if "case" in query.lower():
-        cm_query = query.lower().replace("case", "karton")
-    cm_url = get_cardmarket_de_url(cm_query)
-
-    # Amazon Produktlink
-    amazon_url = get_amazon_search_url(search_query)
+    cm_url_case   = get_cardmarket_de_url(query)
+    # Zweite Suche mit "karton" statt "case" (CM ist inkonsistent)
+    query_karton  = re.sub(r"\bcase\b", "karton", query.lower())
+    cm_url_karton = get_cardmarket_de_url(query_karton) if query_karton != query.lower() else None
 
     text = (
         f"📦 <b>Produkt gefunden</b>\n\n"
         f"🔍 <b>Gesucht:</b> {query}\n"
         f"🏷 <b>Typ:</b> {product_type}\n\n"
-        f"🛒 Cardmarket zeigt alle Varianten sortiert nach Preis.\n"
+        f"🛒 Cardmarket nennt Cases manchmal \"Case\" und manchmal \"Karton\" –\n"
+        f"daher zwei Links für dich.\n\n"
         f"🔔 Aktiviere den Restock-Alert – du wirst sofort benachrichtigt\n"
         f"wenn das Produkt wieder verfügbar ist, <b>inklusive direktem Shop-Link.</b>"
     )
 
     keyboard = [
-        [InlineKeyboardButton("🛒 Cardmarket – Alle Varianten", url=cm_url)],
-        [InlineKeyboardButton("📦 Amazon Pokémon Shop", url=amazon_url)],
-        [InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")],
+        [InlineKeyboardButton("🛒 Cardmarket – als \"Case\"", url=cm_url_case)],
     ]
+    if cm_url_karton:
+        keyboard.append([InlineKeyboardButton("🛒 Cardmarket – als \"Karton\"", url=cm_url_karton)])
+    keyboard.append([InlineKeyboardButton("🔔 Restock-Alert aktivieren", callback_data=f"trackproduct_{search_query}")])
 
     await update.message.reply_text(
         text, parse_mode="HTML",
@@ -3305,6 +3420,86 @@ async def job_new_sets(context: ContextTypes.DEFAULT_TYPE):
         print(f"⚠️ Neue-Sets-Check Fehler: {e}")
 
 
+
+async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Prüft alle bekannten Amazon-Produkte auf Einladungen.
+    Benachrichtigt alle Premium-User automatisch.
+    """
+    # Alle Premium-User holen
+    cursor.execute("SELECT user_id FROM subscriptions WHERE status='active'")
+    all_users = [r[0] for r in cursor.fetchall()]
+    if not all_users:
+        return
+
+    for asin, product_name in KNOWN_AMAZON_PRODUCTS.items():
+        try:
+            status, url = check_amazon_invite(asin)
+
+            # Letzten Status prüfen
+            cursor.execute("SELECT last_status FROM amazon_products WHERE asin=?", (asin,))
+            row = cursor.fetchone()
+            old_status = row[0] if row else "unknown"
+
+            # Status speichern
+            cursor.execute(
+                "INSERT INTO amazon_products (asin, product_name, amazon_url, last_status, added_at) "
+                "VALUES (?,?,?,?,?) ON CONFLICT(asin) DO UPDATE SET "
+                "last_status=excluded.last_status, amazon_url=excluded.amazon_url",
+                (asin, product_name, url, status, datetime.now().isoformat())
+            )
+            conn.commit()
+
+            # Nur bei Einladung oder neu verfügbar benachrichtigen
+            if status not in ("invite", "available"):
+                # Wenn wieder ausverkauft → gesendete Alerts löschen
+                if status == "soldout":
+                    cursor.execute("DELETE FROM amazon_invite_alerts WHERE asin=?", (asin,))
+                    conn.commit()
+                continue
+
+            # Nur wenn Status sich geändert hat
+            if old_status == status:
+                continue
+
+            emoji = "🎟" if status == "invite" else "🛒"
+            status_text = "EINLADUNG VERFÜGBAR" if status == "invite" else "WIEDER VERFÜGBAR"
+
+            for user_id in all_users:
+                # Schon benachrichtigt?
+                cursor.execute(
+                    "SELECT 1 FROM amazon_invite_alerts WHERE asin=? AND user_id=?",
+                    (asin, user_id)
+                )
+                if cursor.fetchone():
+                    continue
+
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=(
+                            f"{emoji} <b>AMAZON {status_text}!</b>\n\n"
+                            f"📦 <b>{product_name}</b>\n\n"
+                            f"{'🎟 Einladungs-Link direkt:' if status == 'invite' else '🛒 Jetzt kaufen:'}\n"
+                            f"{url}\n\n"
+                            f"⚡ <i>Schnell sein – diese Einladungen sind oft nur kurz verfügbar!</i>"
+                        ),
+                        parse_mode="HTML",
+                        disable_web_page_preview=True
+                    )
+                    # Alert als gesendet markieren
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO amazon_invite_alerts (asin, user_id, sent_at) VALUES (?,?,?)",
+                        (asin, user_id, datetime.now().isoformat())
+                    )
+                    conn.commit()
+                except Exception as e:
+                    print(f"⚠️ Amazon Alert senden Fehler ({user_id}): {e}")
+
+        except Exception as e:
+            print(f"⚠️ Amazon Job Fehler ({asin}): {e}")
+
+
 def main():
     global telegram_app_ref
     app = Application.builder().token(BOT_TOKEN).build()
@@ -3320,6 +3515,7 @@ def main():
     jq.run_repeating(job_price_targets,    interval=300,   first=60)   # Preisziele
     jq.run_repeating(job_deal_alerts,      interval=300,   first=90)   # Deal-Alerts
     jq.run_repeating(job_new_sets,         interval=3600,  first=120)  # Neue Sets
+    jq.run_repeating(job_amazon_invite_check, interval=300, first=20) # Amazon alle 5 Min
 
     # Commands
     app.add_handler(CommandHandler("start",        start))

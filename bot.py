@@ -970,7 +970,10 @@ def get_cardmarket_de_url(product_query: str) -> str:
     encoded = q.strip().replace(" ", "%20")
     return (
         f"https://www.cardmarket.com/de/Pokemon/Products/Search"
-        f"?searchString={encoded}&sellerCountry=7&sortBy=price_asc"
+        f"?searchString={encoded}"
+        f"&sellerCountry=7"            # Verkäufer: nur Deutschland
+        f"&idLanguage=1,4"             # Sprache: Englisch + Deutsch
+        f"&sortBy=price_asc"
     )
 
 def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = None) -> str:
@@ -997,7 +1000,11 @@ def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = 
     encoded = q.replace(" ", "%20")
     return (
         f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search"
-        f"?searchString={encoded}&minCondition=2&sortBy=price_asc"
+        f"?searchString={encoded}"
+        f"&sellerCountry=7"            # Verkäufer: nur Deutschland
+        f"&idLanguage=1,4"             # Karten-Sprache: Englisch + Deutsch
+        f"&minCondition=2"             # Mindest-Zustand: Gut
+        f"&sortBy=price_asc"
     )
 
 def find_product_link(search_url: str, query: str) -> str:

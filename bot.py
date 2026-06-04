@@ -969,11 +969,11 @@ def get_cardmarket_de_url(product_query: str) -> str:
     q = re.sub(r"\bupc\b", "Ultra Premium Collection", q)
     encoded = q.strip().replace(" ", "%20")
     return (
-        f"https://www.cardmarket.com/de/Pokemon/Products/Search"
+        "https://www.cardmarket.com/de/Pokemon/Products/Search"
         f"?searchString={encoded}"
-        f"&sellerCountry=7"            # Verkäufer: nur Deutschland
-        f"&idLanguage=1,4"             # Sprache: Englisch + Deutsch
-        f"&sortBy=price_asc"
+        "&sellerCountry=7"
+        "&language=1,4"
+        "&sortBy=price_asc"
     )
 
 def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = None) -> str:
@@ -999,12 +999,12 @@ def get_cardmarket_card_url(card_name: str, set_name: str = None, number: str = 
     q       = " ".join(parts)
     encoded = q.replace(" ", "%20")
     return (
-        f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search"
+        "https://www.cardmarket.com/de/Pokemon/Products/Singles/Search"
         f"?searchString={encoded}"
-        f"&sellerCountry=7"            # Verkäufer: nur Deutschland
-        f"&idLanguage=1,4"             # Karten-Sprache: Englisch + Deutsch
-        f"&minCondition=2"             # Mindest-Zustand: Gut
-        f"&sortBy=price_asc"
+        "&sellerCountry=7"
+        "&language=1,4"
+        "&minCondition=2"
+        "&sortBy=price_asc"
     )
 
 def find_product_link(search_url: str, query: str) -> str:
@@ -1064,12 +1064,14 @@ def find_product_link(search_url: str, query: str) -> str:
             link_lower = link.lower()
             if any(s in link_lower for s in SKIP):
                 continue
-            if link.startswith("#") or link.startswith("javascript"):
+            if link.startswith("#") or link.startswith("javascript") or link.startswith("mailto"):
+                continue
+            if len(link) < 10:
                 continue
             word_score  = sum(1 for w in query_words if w in link_lower)
             if word_score == 0:
                 continue
-            path_bonus  = 5 if path_hints and any(h in link_lower for h in path_hints) else 0
+            path_bonus  = 8 if path_hints and any(h in link_lower for h in path_hints) else 0
             score       = word_score + path_bonus
             if score > best_score:
                 full_link = urljoin(search_url, link)
@@ -1078,7 +1080,8 @@ def find_product_link(search_url: str, query: str) -> str:
                 best_score = score
                 best_link  = full_link
 
-        return best_link if best_score >= 1 else search_url
+        # Mindest-Score 2 damit nicht irgendein zufälliger Link zurückgegeben wird
+        return best_link if best_score >= 2 else search_url
     except Exception as e:
         print(f"⚠️ find_product_link ({search_url[:40]}): {e}")
         return search_url
@@ -1368,7 +1371,7 @@ async def send_card_details(message, card):
                 cm_url = ""
         if not cm_url:
             q = f"{name} {set_nm}".replace(" ", "%20")
-            cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
+            cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}&sellerCountry=7&language=1,4&sortBy=price_asc"
 
     preis_zeilen = []
     if low:
@@ -3785,7 +3788,7 @@ async def job_deal_alerts(context: ContextTypes.DEFAULT_TYPE):
                 cm_url = "https://www.cardmarket.com" + cm_url
             if not cm_url:
                 q = f"{card_name} {set_name or ''}".strip().replace(" ", "%20")
-                cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}"
+                cm_url = f"https://www.cardmarket.com/de/Pokemon/Products/Singles/Search?searchString={q}&sellerCountry=7&language=1,4&sortBy=price_asc"
 
             display_name = card_name + (f" | {set_name}" if set_name else "")
             await context.bot.send_message(
@@ -3935,8 +3938,9 @@ async def job_amazon_invite_check(context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=user_id,
                         text=(
-                            f"🎟 <b>EINLADUNGEN SIND RAUS!</b>\n\n"
+                            f"🎟 <b>AMAZON – EINLADUNGEN SIND RAUS!</b>\n\n"
                             f"📦 <b>{product_name}</b>\n\n"
+                            f"🛒 Direkt bei <b>Amazon DE</b> kaufen:\n"
                             f"👉 <a href='{AMAZON_INVITE_LINK}'>Jetzt Einladung sichern!</a>\n\n"
                             f"⚡ <i>Schnell sein – Einladungen sind oft nur kurz verfügbar!</i>"
                         ),
